@@ -32,6 +32,10 @@ class GscProvider implements AnalyticsProvider {
       baseUrl: isInspect ? _inspectBaseUrl : _baseUrl,
       credential: credential,
       rateLimit: ProviderRateLimit.vercel, // 100 req/min
+      extraHeaders: const {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
     );
   }
 
@@ -111,6 +115,7 @@ class GscProvider implements AnalyticsProvider {
           'dimensions': ['date'],
           'type': searchType.id,
           'aggregationType': aggregationType.id,
+          'dataState': 'all',
           'rowLimit': 100,
         },
       );
@@ -145,6 +150,7 @@ class GscProvider implements AnalyticsProvider {
           'endDate': dateFormat.format(end),
           'dimensions': ['query'],
           'type': searchType.id,
+          'dataState': 'all',
           'rowLimit': 25,
         },
       );
@@ -160,6 +166,7 @@ class GscProvider implements AnalyticsProvider {
           'endDate': dateFormat.format(end),
           'dimensions': ['page'],
           'type': searchType.id,
+          'dataState': 'all',
           'rowLimit': 25,
         },
       );
@@ -175,6 +182,7 @@ class GscProvider implements AnalyticsProvider {
           'endDate': dateFormat.format(end),
           'dimensions': ['country'],
           'type': searchType.id,
+          'dataState': 'all',
           'rowLimit': 10,
         },
       );
@@ -189,6 +197,7 @@ class GscProvider implements AnalyticsProvider {
           'endDate': dateFormat.format(end),
           'dimensions': ['device'],
           'type': searchType.id,
+          'dataState': 'all',
           'rowLimit': 5,
         },
       );
@@ -261,11 +270,54 @@ class GscProvider implements AnalyticsProvider {
     }
   }
 
+  Future<Result<void>> submitSitemap(
+    Credential credential,
+    String siteUrl,
+    String feedPath,
+  ) async {
+    final dio = _client(credential);
+    final encodedSite = Uri.encodeComponent(siteUrl);
+    final encodedFeed = Uri.encodeComponent(feedPath);
+    try {
+      final res = await dio.put<void>('/sites/$encodedSite/sitemaps/$encodedFeed');
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        return const Ok(null);
+      }
+      return Err(apiExceptionFromHttpStatus(res.statusCode ?? 500, body: 'Failed to submit sitemap'));
+    } on DioException catch (e) {
+      return Err(dioExceptionToApiException(e));
+    } catch (e) {
+      return Err(UnknownException.fromError(e));
+    }
+  }
+
+  Future<Result<void>> deleteSitemap(
+    Credential credential,
+    String siteUrl,
+    String feedPath,
+  ) async {
+    final dio = _client(credential);
+    final encodedSite = Uri.encodeComponent(siteUrl);
+    final encodedFeed = Uri.encodeComponent(feedPath);
+    try {
+      final res = await dio.delete<void>('/sites/$encodedSite/sitemaps/$encodedFeed');
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        return const Ok(null);
+      }
+      return Err(apiExceptionFromHttpStatus(res.statusCode ?? 500, body: 'Failed to delete sitemap'));
+    } on DioException catch (e) {
+      return Err(dioExceptionToApiException(e));
+    } catch (e) {
+      return Err(UnknownException.fromError(e));
+    }
+  }
+
   Future<Result<GscInspectionResult>> inspectUrl(
     Credential credential,
     String inspectionUrl,
-    String siteUrl,
-  ) async {
+    String siteUrl, {
+    String languageCode = 'en-US',
+  }) async {
     final dio = _client(credential, isInspect: true);
     try {
       final res = await dio.post<Map<String, dynamic>>(
@@ -273,6 +325,7 @@ class GscProvider implements AnalyticsProvider {
         data: {
           'inspectionUrl': inspectionUrl,
           'siteUrl': siteUrl,
+          'languageCode': languageCode,
         },
       );
       return Ok(GscInspectionResult.fromJson(res.data ?? {}, inspectionUrl));

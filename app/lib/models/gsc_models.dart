@@ -5,7 +5,8 @@ enum GscSearchType {
   image('image', 'Image'),
   video('video', 'Video'),
   news('news', 'News'),
-  discover('discover', 'Discover');
+  discover('discover', 'Discover'),
+  googleNews('googleNews', 'Google News');
 
   const GscSearchType(this.id, this.displayName);
   final String id;
@@ -15,7 +16,8 @@ enum GscSearchType {
 enum GscAggregationType {
   auto('auto', 'Auto'),
   byProperty('byProperty', 'By Property'),
-  byPage('byPage', 'By Page');
+  byPage('byPage', 'By Page'),
+  byNewsShowcasePanel('byNewsShowcasePanel', 'News Showcase');
 
   const GscAggregationType(this.id, this.displayName);
   final String id;
@@ -209,6 +211,7 @@ class GscSitemap {
   const GscSitemap({
     required this.path,
     this.lastSubmitted,
+    this.lastDownloaded,
     this.status,
     required this.totalUrls,
     required this.indexedUrls,
@@ -222,6 +225,7 @@ class GscSitemap {
 
   final String path;
   final DateTime? lastSubmitted;
+  final DateTime? lastDownloaded;
   final String? status;
   final int totalUrls;
   final int indexedUrls;
@@ -251,6 +255,9 @@ class GscSitemap {
       lastSubmitted: json['lastSubmitted'] != null
           ? DateTime.tryParse(json['lastSubmitted'].toString())
           : null,
+      lastDownloaded: json['lastDownloaded'] != null
+          ? DateTime.tryParse(json['lastDownloaded'].toString())
+          : null,
       status: json['status'] as String? ?? 'UNKNOWN',
       totalUrls: total,
       indexedUrls: indexed,
@@ -276,6 +283,11 @@ class GscInspectionResult {
     this.crawledAs = 'MOBILE',
     this.robotsTxtState = 'ALLOWED',
     this.mobileUsabilityVerdict = 'PASS',
+    this.inspectionResultLink,
+    this.referringUrls = const [],
+    this.sitemaps = const [],
+    this.richResultsVerdict = 'PASS',
+    this.richResultsTypes = const [],
   });
 
   final String inspectedUrl;
@@ -289,6 +301,11 @@ class GscInspectionResult {
   final String crawledAs;
   final String robotsTxtState;
   final String mobileUsabilityVerdict;
+  final String? inspectionResultLink;
+  final List<String> referringUrls;
+  final List<String> sitemaps;
+  final String? richResultsVerdict;
+  final List<String> richResultsTypes;
 
   String get inspectionUrl => inspectedUrl;
 
@@ -313,6 +330,19 @@ class GscInspectionResult {
         inspectResult['indexStatusResult'] as Map<String, dynamic>? ?? {};
     final mobileResult =
         inspectResult['mobileUsabilityResult'] as Map<String, dynamic>? ?? {};
+    final richResult =
+        inspectResult['richResultsResult'] as Map<String, dynamic>? ?? {};
+
+    final rawDetectedItems = (richResult['detectedItems'] as List?) ?? [];
+    final richTypes = <String>[];
+    for (final item in rawDetectedItems) {
+      if (item is Map) {
+        final type = item['richResultType']?.toString() ?? '';
+        if (type.isNotEmpty && !richTypes.contains(type)) {
+          richTypes.add(type);
+        }
+      }
+    }
 
     return GscInspectionResult(
       inspectedUrl: url,
@@ -328,6 +358,17 @@ class GscInspectionResult {
       crawledAs: indexStatusResult['crawledAs'] as String? ?? 'MOBILE',
       robotsTxtState: indexStatusResult['robotsTxtState'] as String? ?? 'ALLOWED',
       mobileUsabilityVerdict: mobileResult['verdict'] as String? ?? 'PASS',
+      inspectionResultLink: inspectResult['inspectionResultLink'] as String?,
+      referringUrls: (indexStatusResult['referringUrls'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      sitemaps: (indexStatusResult['sitemap'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      richResultsVerdict: richResult['verdict'] as String? ?? 'PASS',
+      richResultsTypes: richTypes,
     );
   }
 }

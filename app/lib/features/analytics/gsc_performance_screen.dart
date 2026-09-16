@@ -1148,6 +1148,14 @@ class _UrlInspectionModalState extends ConsumerState<_UrlInspectionModal> {
           _kv('Page Fetch', res.pageFetchState ?? 'SUCCESSFUL', hh),
           _kv('Indexing Allowed', res.robotsTxtState, hh),
           _kv('Mobile Friendly', res.mobileUsabilityVerdict, hh),
+          if (res.userCanonical != null && res.userCanonical!.isNotEmpty)
+            _kv('User Canonical', res.userCanonical!, hh),
+          if (res.googleCanonical != null && res.googleCanonical!.isNotEmpty)
+            _kv('Google Canonical', res.googleCanonical!, hh),
+          if (res.sitemaps.isNotEmpty)
+            _kv('Sitemap', res.sitemaps.first, hh),
+          if (res.richResultsTypes.isNotEmpty)
+            _kv('Rich Results', res.richResultsTypes.join(', '), hh),
           if (res.lastCrawlTime != null)
             _kv(
               'Last Crawl',

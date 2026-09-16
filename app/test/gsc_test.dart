@@ -84,6 +84,7 @@ void main() {
         'path': 'https://thehiveminds.in/sitemap.xml',
         'type': 'sitemap',
         'lastSubmitted': '2026-08-15T12:00:00Z',
+        'lastDownloaded': '2026-08-16T14:30:00Z',
         'isPending': false,
         'isSitemapsIndex': false,
         'errors': 0,
@@ -93,6 +94,8 @@ void main() {
       final sitemap = GscSitemap.fromJson(json);
       expect(sitemap.path, equals('https://thehiveminds.in/sitemap.xml'));
       expect(sitemap.type, equals('sitemap'));
+      expect(sitemap.lastDownloaded, isNotNull);
+      expect(sitemap.lastDownloaded?.day, equals(16));
       expect(sitemap.hasErrors, isFalse);
       expect(sitemap.isPending, isFalse);
     });
@@ -100,6 +103,7 @@ void main() {
     test('GscInspectionResult parses indexing verdict and coverage', () {
       final json = {
         'inspectionResult': {
+          'inspectionResultLink': 'https://search.google.com/search-console/inspect?resource_id=123',
           'indexStatusResult': {
             'verdict': 'PASS',
             'coverageState': 'Submitted and indexed',
@@ -107,9 +111,26 @@ void main() {
             'pageFetchState': 'SUCCESSFUL',
             'robotsTxtState': 'ALLOWED',
             'lastCrawlTime': '2026-09-01T10:00:00Z',
+            'googleCanonical': 'https://thehiveminds.in/about',
+            'userCanonical': 'https://thehiveminds.in/about',
+            'referringUrls': ['https://thehiveminds.in/'],
+            'sitemap': ['https://thehiveminds.in/sitemap.xml'],
           },
           'mobileUsabilityResult': {
             'verdict': 'PASS',
+          },
+          'richResultsResult': {
+            'verdict': 'PASS',
+            'detectedItems': [
+              {
+                'richResultType': 'Breadcrumbs',
+                'items': [],
+              },
+              {
+                'richResultType': 'Article',
+                'items': [],
+              },
+            ],
           },
         },
       };
@@ -123,6 +144,18 @@ void main() {
       expect(result.coverageState, equals('Submitted and indexed'));
       expect(result.crawledAs, equals('MOBILE'));
       expect(result.mobileUsabilityVerdict, equals('PASS'));
+      expect(result.googleCanonical, equals('https://thehiveminds.in/about'));
+      expect(result.userCanonical, equals('https://thehiveminds.in/about'));
+      expect(result.sitemaps.length, equals(1));
+      expect(result.sitemaps.first, equals('https://thehiveminds.in/sitemap.xml'));
+      expect(result.richResultsTypes, contains('Breadcrumbs'));
+      expect(result.richResultsTypes, contains('Article'));
+      expect(result.inspectionResultLink, contains('inspect?resource_id=123'));
+    });
+
+    test('GscSearchType and GscAggregationType match full RFC specification', () {
+      expect(GscSearchType.googleNews.id, equals('googleNews'));
+      expect(GscAggregationType.byNewsShowcasePanel.id, equals('byNewsShowcasePanel'));
     });
   });
 

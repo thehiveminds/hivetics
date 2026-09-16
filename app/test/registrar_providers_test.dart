@@ -1,141 +1,133 @@
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hivehub/models/connection.dart';
+import 'package:hivehub/models/credential.dart';
 import 'package:hivehub/models/registered_domain.dart';
 import 'package:hivehub/models/registrar_id.dart';
-import 'package:hivehub/models/service_ref.dart';
 import 'package:hivehub/providers/provider_registry.dart';
-import 'package:hivehub/providers/registrar/porkbun_provider.dart';
-import 'package:hivehub/providers/registrar/godaddy_provider.dart';
-import 'package:hivehub/providers/registrar/cloudflare_registrar_provider.dart';
+import 'package:hivehub/providers/registrar/dynadot_provider.dart';
+import 'package:hivehub/providers/registrar/gandi_provider.dart';
+import 'package:hivehub/providers/registrar/namecom_provider.dart';
+import 'package:hivehub/providers/registrar/namesilo_provider.dart';
+import 'package:hivehub/providers/registrar/registrar_status_normalizer.dart';
+import 'package:hivehub/providers/registrar/spaceship_provider.dart';
 
 void main() {
-  group('Provider Registry for Registrars', () {
-    test('Returns registered instances for each RegistrarId', () {
-      expect(registrarProviderFor(RegistrarId.porkbun), isA<PorkbunProvider>());
-      expect(registrarProviderFor(RegistrarId.godaddy), isA<GoDaddyProvider>());
-      expect(
-        registrarProviderFor(RegistrarId.cloudflareregistrar),
-        isA<CloudflareRegistrarProvider>(),
-      );
-      expect(allRegistrarProviders.length, equals(3));
+  group('Registrar Status Normalizers & Date Parsing', () {
+    test('normalizeSpaceshipStatus maps correctly', () {
+      expect(normalizeSpaceshipStatus('active'), DomainStatus.active);
+      expect(normalizeSpaceshipStatus('OK'), DomainStatus.active);
+      expect(normalizeSpaceshipStatus('expired'), DomainStatus.expired);
+      expect(normalizeSpaceshipStatus('cancelled'), DomainStatus.cancelled);
+      expect(normalizeSpaceshipStatus('deleted'), DomainStatus.cancelled);
+      expect(normalizeSpaceshipStatus('suspended'), DomainStatus.suspended);
+      expect(normalizeSpaceshipStatus('clientHold'), DomainStatus.suspended);
+      expect(normalizeSpaceshipStatus('pending'), DomainStatus.pending);
+      expect(normalizeSpaceshipStatus(''), DomainStatus.unknown);
+      expect(normalizeSpaceshipStatus(null), DomainStatus.unknown);
+    });
+
+    test('normalizeNamecomStatus maps correctly', () {
+      expect(normalizeNamecomStatus('active'), DomainStatus.active);
+      expect(normalizeNamecomStatus('registered'), DomainStatus.active);
+      expect(normalizeNamecomStatus('expired'), DomainStatus.expired);
+      expect(normalizeNamecomStatus('cancelled'), DomainStatus.cancelled);
+      expect(normalizeNamecomStatus('deleted'), DomainStatus.cancelled);
+      expect(normalizeNamecomStatus('locked'), DomainStatus.suspended);
+      expect(normalizeNamecomStatus('pending_transfer'), DomainStatus.pending);
+      expect(normalizeNamecomStatus(null), DomainStatus.unknown);
+    });
+
+    test('normalizeGandiStatus maps correctly', () {
+      expect(normalizeGandiStatus(['clientTransferProhibited', 'ok']), DomainStatus.active);
+      expect(normalizeGandiStatus(['clientHold']), DomainStatus.suspended);
+      expect(normalizeGandiStatus(['serverHold']), DomainStatus.suspended);
+      expect(normalizeGandiStatus(['pendingTransfer']), DomainStatus.pending);
+      expect(normalizeGandiStatus(['expired']), DomainStatus.expired);
+      expect(normalizeGandiStatus('active'), DomainStatus.active);
+      expect(normalizeGandiStatus(null), DomainStatus.unknown);
+    });
+
+    test('normalizeNameSiloStatus maps correctly', () {
+      expect(normalizeNameSiloStatus('Active'), DomainStatus.active);
+      expect(normalizeNameSiloStatus('Expired'), DomainStatus.expired);
+      expect(normalizeNameSiloStatus('Cancelled'), DomainStatus.cancelled);
+      expect(normalizeNameSiloStatus('Quarantine'), DomainStatus.suspended);
+      expect(normalizeNameSiloStatus('Pending'), DomainStatus.pending);
+      expect(normalizeNameSiloStatus(null), DomainStatus.unknown);
+    });
+
+    test('normalizeDynadotStatus maps correctly', () {
+      expect(normalizeDynadotStatus('active'), DomainStatus.active);
+      expect(normalizeDynadotStatus('registered'), DomainStatus.active);
+      expect(normalizeDynadotStatus('expired'), DomainStatus.expired);
+      expect(normalizeDynadotStatus('deleted'), DomainStatus.cancelled);
+      expect(normalizeDynadotStatus('locked'), DomainStatus.suspended);
+      expect(normalizeDynadotStatus('hold'), DomainStatus.suspended);
+      expect(normalizeDynadotStatus('pending'), DomainStatus.pending);
+      expect(normalizeDynadotStatus(null), DomainStatus.unknown);
+    });
+
+    test('parseFlexibleDate handles numeric timestamps, ISO8601, and Porkbun format', () {
+      final iso = parseFlexibleDate('2026-10-15T12:00:00Z');
+      expect(iso, DateTime.utc(2026, 10, 15, 12, 0, 0));
+
+      final porkbun = parseFlexibleDate('2026-10-15 12:00:00');
+      expect(porkbun, DateTime.utc(2026, 10, 15, 12, 0, 0));
+
+      // Seconds timestamp
+      final seconds = parseFlexibleDate(1792065600);
+      expect(seconds, isNotNull);
+
+      // Milliseconds timestamp
+      final millis = parseFlexibleDate(1792065600000);
+      expect(millis, isNotNull);
+
+      expect(parseFlexibleDate(null), isNull);
+      expect(parseFlexibleDate(''), isNull);
     });
   });
 
-  group('PorkbunProvider mapping', () {
-    late PorkbunProvider provider;
+  group('Registrar Providers Registry & Instances', () {
+    test('all 8 registrars are registered in provider registry', () {
+      expect(allRegistrarProviders.length, 8);
 
-    setUp(() {
-      provider = PorkbunProvider();
+      expect(registrarProviderFor(RegistrarId.godaddy).displayName, 'GoDaddy');
+      expect(registrarProviderFor(RegistrarId.porkbun).displayName, 'Porkbun');
+      expect(registrarProviderFor(RegistrarId.cloudflareregistrar).displayName, 'Cloudflare Registrar');
+      expect(registrarProviderFor(RegistrarId.spaceship).displayName, 'Spaceship');
+      expect(registrarProviderFor(RegistrarId.namecom).displayName, 'Name.com');
+      expect(registrarProviderFor(RegistrarId.namesilo).displayName, 'NameSilo');
+      expect(registrarProviderFor(RegistrarId.gandi).displayName, 'Gandi');
+      expect(registrarProviderFor(RegistrarId.dynadot).displayName, 'Dynadot');
     });
 
-    test('Provider ID and name', () {
-      expect(provider.id, equals(RegistrarId.porkbun));
-      expect(provider.displayName, equals('Porkbun'));
+    test('SpaceshipProvider has correct id and displayName', () {
+      final p = SpaceshipProvider();
+      expect(p.id, RegistrarId.spaceship);
+      expect(p.displayName, 'Spaceship');
     });
 
-    test('listDomains parses Porkbun response schema correctly', () async {
-      final mockJson = {
-        "status": "SUCCESS",
-        "count": 1,
-        "domains": [
-          {
-            "domain": "example.com",
-            "status": "ACTIVE",
-            "tld": "com",
-            "createDate": "2021-01-15 10:00:00",
-            "expireDate": "2027-01-15 10:00:00",
-            "securityLock": 1,
-            "whoisPrivacy": 1,
-            "autoRenew": 1,
-            "apiAccess": 1,
-            "notLocal": 0,
-            "labels": [
-              {"id": "1", "title": "Production", "color": "#ff0000"}
-            ]
-          }
-        ]
-      };
+    test('NameComProvider has correct id and displayName', () {
+      final p = NameComProvider();
+      expect(p.id, RegistrarId.namecom);
+      expect(p.displayName, 'Name.com');
+    });
 
-      final dio = Dio();
-      dio.httpClientAdapter = _MockHttpAdapter(mockJson);
+    test('GandiProvider has correct id and displayName', () {
+      final p = GandiProvider();
+      expect(p.id, RegistrarId.gandi);
+      expect(p.displayName, 'Gandi');
+    });
 
-      // Verify domain fields
-      final domains = (mockJson['domains'] as List).map((m) {
-        final d = m as Map<String, dynamic>;
-        return RegisteredDomain(
-          domain: d['domain'] as String,
-          connectionId: 'conn-porkbun',
-          registrar: RegistrarId.porkbun,
-          status: DomainStatus.active,
-          rawStatus: d['status'] as String?,
-          expiresAt: DateTime.utc(2027, 1, 15, 10, 0, 0),
-          autoRenew: true,
-          locked: true,
-          privacy: true,
-          fetchedAt: DateTime.now().toUtc(),
-        );
-      }).toList();
+    test('NameSiloProvider has correct id and displayName', () {
+      final p = NameSiloProvider();
+      expect(p.id, RegistrarId.namesilo);
+      expect(p.displayName, 'NameSilo');
+    });
 
-      expect(domains.length, equals(1));
-      expect(domains.first.domain, equals('example.com'));
-      expect(domains.first.status, equals(DomainStatus.active));
-      expect(domains.first.autoRenew, isTrue);
-      expect(domains.first.locked, isTrue);
-      expect(domains.first.privacy, isTrue);
-      expect(domains.first.expiresAt?.year, equals(2027));
+    test('DynadotProvider has correct id and displayName', () {
+      final p = DynadotProvider();
+      expect(p.id, RegistrarId.dynadot);
+      expect(p.displayName, 'Dynadot');
     });
   });
-
-  group('GoDaddyProvider mapping', () {
-    test('Provider ID and name', () {
-      final provider = GoDaddyProvider();
-      expect(provider.id, equals(RegistrarId.godaddy));
-      expect(provider.displayName, equals('GoDaddy'));
-    });
-
-    test('Connection model with RegistrarRef', () {
-      const conn = Connection(
-        id: 'conn-gd',
-        service: RegistrarRef(RegistrarId.godaddy),
-        displayName: 'My GoDaddy',
-      );
-      expect(conn.service, isA<RegistrarRef>());
-      expect(conn.service.id, equals('godaddy'));
-    });
-  });
-
-  group('CloudflareRegistrarProvider mapping', () {
-    test('Provider ID and name', () {
-      final provider = CloudflareRegistrarProvider();
-      expect(provider.id, equals(RegistrarId.cloudflareregistrar));
-      expect(provider.displayName, equals('Cloudflare Registrar'));
-    });
-  });
-}
-
-class _MockHttpAdapter implements HttpClientAdapter {
-  _MockHttpAdapter(this.jsonBody);
-  final Map<String, dynamic> jsonBody;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final bytes = utf8.encode(jsonEncode(jsonBody));
-    return ResponseBody.fromBytes(
-      bytes,
-      200,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
 }

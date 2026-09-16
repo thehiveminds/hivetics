@@ -17,7 +17,22 @@ enum ProviderRateLimit {
   godaddy(maxRequests: 60, windowSeconds: 60),
 
   /// Conservative 60/min bucket. Backs off on 429 via RetryInterceptor.
-  porkbun(maxRequests: 60, windowSeconds: 60);
+  porkbun(maxRequests: 60, windowSeconds: 60),
+
+  /// Spaceship API
+  spaceship(maxRequests: 60, windowSeconds: 60),
+
+  /// Name.com API
+  namecom(maxRequests: 60, windowSeconds: 60),
+
+  /// NameSilo API
+  namesilo(maxRequests: 60, windowSeconds: 60),
+
+  /// Gandi API
+  gandi(maxRequests: 60, windowSeconds: 60),
+
+  /// Dynadot API
+  dynadot(maxRequests: 60, windowSeconds: 60);
 
   const ProviderRateLimit({
     required this.maxRequests,

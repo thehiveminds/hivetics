@@ -10,6 +10,11 @@ import 'registrar/registrar_provider.dart';
 import 'registrar/godaddy_provider.dart';
 import 'registrar/porkbun_provider.dart';
 import 'registrar/cloudflare_registrar_provider.dart';
+import 'registrar/spaceship_provider.dart';
+import 'registrar/namecom_provider.dart';
+import 'registrar/gandi_provider.dart';
+import 'registrar/namesilo_provider.dart';
+import 'registrar/dynadot_provider.dart';
 
 final _hostingRegistry = <ProviderId, HostingProvider>{
   ProviderId.vercel: VercelProvider(),
@@ -21,6 +26,11 @@ final _registrarRegistry = <RegistrarId, RegistrarProvider>{
   RegistrarId.godaddy: GoDaddyProvider(),
   RegistrarId.porkbun: PorkbunProvider(),
   RegistrarId.cloudflareregistrar: CloudflareRegistrarProvider(),
+  RegistrarId.spaceship: SpaceshipProvider(),
+  RegistrarId.namecom: NameComProvider(),
+  RegistrarId.gandi: GandiProvider(),
+  RegistrarId.namesilo: NameSiloProvider(),
+  RegistrarId.dynadot: DynadotProvider(),
 };
 
 HostingProvider providerFor(ProviderId id) {

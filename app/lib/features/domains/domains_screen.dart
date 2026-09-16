@@ -233,6 +233,16 @@ class _DomainsScreenState extends ConsumerState<DomainsScreen> {
         'https://porkbun.com/account/domains',
       RegistrarId.cloudflareregistrar =>
         'https://dash.cloudflare.com',
+      RegistrarId.spaceship =>
+        'https://www.spaceship.com/application/',
+      RegistrarId.namecom =>
+        'https://www.name.com/account/domain',
+      RegistrarId.namesilo =>
+        'https://www.namesilo.com/account_domains.php',
+      RegistrarId.gandi =>
+        'https://admin.gandi.net/domain',
+      RegistrarId.dynadot =>
+        'https://www.dynadot.com/account/domain/manage.html',
     };
 
     showCupertinoModalPopup<void>(

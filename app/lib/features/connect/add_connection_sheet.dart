@@ -329,10 +329,14 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
       );
     } else {
       final Credential cred;
-      if (_registrarProvider == RegistrarId.porkbun) {
+      if (_registrarProvider == RegistrarId.porkbun ||
+          _registrarProvider == RegistrarId.spaceship ||
+          _registrarProvider == RegistrarId.namecom) {
         if (_token.isEmpty || _secretKey.isEmpty) {
+          final first = _registrarProvider == RegistrarId.namecom ? 'Username' : 'API Key';
+          final second = _registrarProvider == RegistrarId.namecom ? 'API Token' : 'Secret Key';
           setState(() =>
-              _errorMessage = 'Please enter both API Key and Secret Key');
+              _errorMessage = 'Please enter both $first and $second');
           return;
         }
         cred = KeyPairCredential(
@@ -361,7 +365,7 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
         }
       } else {
         if (_token.isEmpty) {
-          setState(() => _errorMessage = 'Please paste your API token above');
+          setState(() => _errorMessage = 'Please paste your API token or key above');
           return;
         }
         cred = BearerCredential(token: _token.trim());
@@ -703,6 +707,11 @@ class _RegistrarCard extends StatelessWidget {
       RegistrarId.godaddy => 'Domains & DNS management',
       RegistrarId.porkbun => 'Domains & DNS management',
       RegistrarId.cloudflareregistrar => 'Domains & DNS zones',
+      RegistrarId.spaceship => 'Domains & modern DNS',
+      RegistrarId.namecom => 'Domains & DNS records',
+      RegistrarId.namesilo => 'Low-cost domains & DNS',
+      RegistrarId.gandi => 'No Bullshit domains & DNS',
+      RegistrarId.dynadot => 'Domains & advanced DNS',
     };
 
     return AppPressable(
@@ -784,7 +793,10 @@ class _CredentialsEntry extends StatelessWidget {
   final VoidCallback onSubmit;
   final HHTokens hh;
 
-  bool get isPorkbun => registrarProvider == RegistrarId.porkbun;
+  bool get needsKeyPair =>
+      registrarProvider == RegistrarId.porkbun ||
+      registrarProvider == RegistrarId.spaceship ||
+      registrarProvider == RegistrarId.namecom;
 
   String get displayName => hostingProvider != null
       ? hostingProvider!.displayName
@@ -801,7 +813,44 @@ class _CredentialsEntry extends StatelessWidget {
             RegistrarId.porkbun => 'https://porkbun.com/account/api',
             RegistrarId.cloudflareregistrar =>
               'https://dash.cloudflare.com/profile/api-tokens',
+            RegistrarId.spaceship =>
+              'https://www.spaceship.com/application/api/',
+            RegistrarId.namecom =>
+              'https://www.name.com/account/settings/api',
+            RegistrarId.namesilo =>
+              'https://www.namesilo.com/account_api.php',
+            RegistrarId.gandi =>
+              'https://admin.gandi.net/user/security',
+            RegistrarId.dynadot =>
+              'https://www.dynadot.com/account/domain/api.html',
           },
+      };
+
+  String get _firstFieldLabel => switch (registrarProvider) {
+        RegistrarId.namecom => 'USERNAME',
+        RegistrarId.spaceship || RegistrarId.porkbun => 'API KEY',
+        _ => '',
+      };
+
+  String get _firstFieldHint => switch (registrarProvider) {
+        RegistrarId.namecom => 'Enter Name.com username',
+        RegistrarId.spaceship => 'Enter Spaceship API Key',
+        RegistrarId.porkbun => 'Enter API Key (pk1_...)',
+        _ => 'Paste your $displayName token or key',
+      };
+
+  String get _secondFieldLabel => switch (registrarProvider) {
+        RegistrarId.namecom => 'API TOKEN',
+        RegistrarId.spaceship => 'API SECRET',
+        RegistrarId.porkbun => 'SECRET API KEY',
+        _ => '',
+      };
+
+  String get _secondFieldHint => switch (registrarProvider) {
+        RegistrarId.namecom => 'Enter Name.com API Token',
+        RegistrarId.spaceship => 'Enter Spaceship API Secret',
+        RegistrarId.porkbun => 'Enter Secret API Key (sk1_...)',
+        _ => '',
       };
 
   @override
@@ -842,8 +891,8 @@ class _CredentialsEntry extends StatelessWidget {
         const SizedBox(height: HHSpacing.lg),
 
         // Primary Field (Token or API Key)
-        if (isPorkbun) ...[
-          Text('API KEY', style: hh.caption2()),
+        if (needsKeyPair) ...[
+          Text(_firstFieldLabel, style: hh.caption2()),
           const SizedBox(height: HHSpacing.xs),
         ],
         TextField(
@@ -851,7 +900,7 @@ class _CredentialsEntry extends StatelessWidget {
           obscureText: tokenObscured,
           style: hh.mono(),
           decoration: InputDecoration(
-            hintText: isPorkbun ? 'Enter API Key (pk1_...)' : 'Paste your $displayName token',
+            hintText: _firstFieldHint,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: HHSpacing.md,
               vertical: HHSpacing.md,
@@ -876,17 +925,17 @@ class _CredentialsEntry extends StatelessWidget {
           ),
         ),
 
-        // Second Field (Secret Key for Porkbun)
-        if (isPorkbun) ...[
+        // Second Field (Secret Key / Token for KeyPair providers)
+        if (needsKeyPair) ...[
           const SizedBox(height: HHSpacing.md),
-          Text('SECRET API KEY', style: hh.caption2()),
+          Text(_secondFieldLabel, style: hh.caption2()),
           const SizedBox(height: HHSpacing.xs),
           TextField(
             controller: secretController,
             obscureText: secretObscured,
             style: hh.mono(),
             decoration: InputDecoration(
-              hintText: 'Enter Secret API Key (sk1_...)',
+              hintText: _secondFieldHint,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: HHSpacing.md,
                 vertical: HHSpacing.md,
@@ -1040,6 +1089,16 @@ class _CredentialsEntry extends StatelessWidget {
         '1. Go to porkbun.com/account/api\n2. Generate an API Key and API Secret\n3. In your Porkbun Domain Management list, ensure "API Access" is enabled for the domains you want visible here\n4. Paste both keys above',
       RegistrarId.cloudflareregistrar =>
         '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Create a Custom Token with:\n   • Account · Registrar Domains · Read\n   • Account · Account Settings · Read\n   • Zone · DNS · Read\n3. Copy and paste the token above',
+      RegistrarId.spaceship =>
+        '1. Go to spaceship.com → Account Settings → API\n2. Click "Generate API Key"\n3. Copy both API Key and API Secret\n4. Paste both keys above',
+      RegistrarId.namecom =>
+        '1. Go to name.com → Account Settings → API\n2. Generate a Production API Token\n3. Enter your Name.com account username and the generated API Token above',
+      RegistrarId.namesilo =>
+        '1. Go to namesilo.com → API Manager\n2. Generate an API Key\n3. Paste the API key above',
+      RegistrarId.gandi =>
+        '1. Go to admin.gandi.net → User Settings → Authentication & Security\n2. Under "Personal Access Tokens", click "Create a token"\n3. Grant Read permissions for Domains and DNS\n4. Paste the token above',
+      RegistrarId.dynadot =>
+        '1. Go to dynadot.com → Tools → API\n2. Enable API access and generate an API Key\n3. Paste the API key above',
     };
   }
 }

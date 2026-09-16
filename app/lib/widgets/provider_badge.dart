@@ -156,6 +156,36 @@ class RegistrarBadge extends StatelessWidget {
             bg: HHColors.cloudflareBg,
             fg: Color(0xFFFFFFFF),
           ),
+        RegistrarId.spaceship => const _BadgeConfig(
+            svgPath: 'assets/icons/spaceship.svg',
+            fallbackIcon: LucideIcons.rocket,
+            bg: Color(0xFF6B46C1),
+            fg: Color(0xFFFFFFFF),
+          ),
+        RegistrarId.namecom => const _BadgeConfig(
+            svgPath: 'assets/icons/namecom.svg',
+            fallbackIcon: LucideIcons.globe,
+            bg: Color(0xFF00A499),
+            fg: Color(0xFFFFFFFF),
+          ),
+        RegistrarId.namesilo => const _BadgeConfig(
+            svgPath: 'assets/icons/namesilo.svg',
+            fallbackIcon: LucideIcons.shield,
+            bg: Color(0xFF0073AA),
+            fg: Color(0xFFFFFFFF),
+          ),
+        RegistrarId.gandi => const _BadgeConfig(
+            svgPath: 'assets/icons/gandi.svg',
+            fallbackIcon: LucideIcons.globe,
+            bg: Color(0xFFFA6400),
+            fg: Color(0xFFFFFFFF),
+          ),
+        RegistrarId.dynadot => const _BadgeConfig(
+            svgPath: 'assets/icons/dynadot.svg',
+            fallbackIcon: LucideIcons.compass,
+            bg: Color(0xFF28B78D),
+            fg: Color(0xFFFFFFFF),
+          ),
       };
 }
 

@@ -172,6 +172,11 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
       RegistrarId.porkbun => normalizePorkbunStatus(row.rawStatus),
       RegistrarId.cloudflareregistrar =>
         normalizeCloudflareRegistrarStatus(row.rawStatus),
+      RegistrarId.spaceship => normalizeSpaceshipStatus(row.rawStatus),
+      RegistrarId.namecom => normalizeNamecomStatus(row.rawStatus),
+      RegistrarId.gandi => normalizeGandiStatus(row.rawStatus),
+      RegistrarId.namesilo => normalizeNameSiloStatus(row.rawStatus),
+      RegistrarId.dynadot => normalizeDynadotStatus(row.rawStatus),
     };
 
     return RegisteredDomain(

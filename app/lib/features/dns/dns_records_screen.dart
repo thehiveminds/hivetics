@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,6 +8,7 @@ import '../../models/registrar_id.dart';
 import '../../shared/formatters.dart';
 import '../../shared/haptics.dart';
 import '../../shared/theme.dart';
+import '../../state/connections_notifier.dart';
 import '../../state/domains_notifier.dart';
 import '../../widgets/app_nav_bar.dart';
 import '../../widgets/app_pressable.dart';
@@ -38,6 +40,21 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
 
   static const _types = ['All', 'A', 'CNAME', 'TXT', 'MX', 'NS'];
 
+  Future<void> _refresh() async {
+    HHHaptics.selectionClick();
+    final db = ref.read(dbProvider);
+    await db.replaceDnsRecordsForDomain(
+      widget.connectionId,
+      widget.domain,
+      const [],
+    );
+    ref.invalidate(dnsRecordsProvider((
+      connectionId: widget.connectionId,
+      domain: widget.domain,
+      registrar: widget.registrar,
+    )));
+  }
+
   @override
   Widget build(BuildContext context) {
     final hh = context.hh;
@@ -64,7 +81,7 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
     final hasExternalNs = domainObj != null &&
         domainObj.nameServers.isNotEmpty &&
         !domainObj.nameServers.any(
-          (ns) => ns.toLowerCase().contains(widget.registrar.name.toLowerCase()),
+          (ns) => _isRegistrarNameserver(widget.registrar, ns),
         );
 
     return Scaffold(
@@ -74,6 +91,16 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
           AppNavBar(
             title: widget.domain,
             showBackButton: true,
+            trailing: [
+              AppPressable(
+                onTap: _refresh,
+                child: Icon(LucideIcons.refreshCw, size: 18, color: hh.accent),
+              ),
+            ],
+          ),
+
+          CupertinoSliverRefreshControl(
+            onRefresh: _refresh,
           ),
 
           // Domain Overview Card (§5.1 & §6.6)
@@ -115,19 +142,20 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
             ),
           ),
 
-          // DNS Type Filter Chips
+          // DNS Type Filter Chips (matching SitesScreen and DomainsScreen)
           SliverToBoxAdapter(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: HHSpacing.screenPadding,
-                vertical: HHSpacing.sm,
-              ),
-              child: Row(
+            child: SizedBox(
+              height: 48,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: HHSpacing.screenPadding,
+                  vertical: HHSpacing.sm,
+                ),
                 children: _types.map((t) {
                   final selected = _typeFilter == t;
                   return Padding(
-                    padding: const EdgeInsets.only(right: HHSpacing.xs),
+                    padding: const EdgeInsets.only(right: HHSpacing.sm),
                     child: AppPressable(
                       onTap: () {
                         HHHaptics.selectionClick();
@@ -135,10 +163,7 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
                       },
                       child: AnimatedContainer(
                         duration: HHMotion.fast,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
                           color: selected ? hh.accent : hh.bgElevated,
                           borderRadius: HHRadius.pillBr(),
@@ -149,6 +174,7 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
                             width: 0.5,
                           ),
                         ),
+                        alignment: Alignment.center,
                         child: Text(
                           t,
                           style: hh.caption().copyWith(
@@ -198,6 +224,26 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
                         style: hh.footnote().copyWith(color: hh.textSecondary),
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: HHSpacing.lg),
+                      AppPressable(
+                        onTap: _refresh,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: hh.bgElevated,
+                            borderRadius: HHRadius.pillBr(),
+                            border: Border.all(color: hh.cardBorder, width: 0.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.refreshCw, size: 14, color: hh.textPrimary),
+                              const SizedBox(width: 6),
+                              Text('Retry', style: hh.caption().copyWith(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -206,6 +252,7 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
             data: (records) {
               final filtered = _applyFilters(records);
               if (filtered.isEmpty) {
+                final isFiltered = _typeFilter != 'All' && records.isNotEmpty;
                 return SliverFillRemaining(
                   hasScrollBody: false,
                   child: Center(
@@ -215,24 +262,58 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            hasExternalNs ? LucideIcons.cloud : LucideIcons.fileQuestion,
+                            isFiltered
+                                ? LucideIcons.filter
+                                : (hasExternalNs ? LucideIcons.globe : LucideIcons.fileQuestion),
                             size: 36,
                             color: hh.textTertiary,
                           ),
                           const SizedBox(height: HHSpacing.md),
                           Text(
-                            'No DNS records found',
+                            isFiltered
+                                ? 'No $_typeFilter records'
+                                : 'No DNS records found',
                             style: hh.headline(),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: HHSpacing.xs),
                           Text(
-                            hasExternalNs
-                                ? 'This domain uses external nameservers. DNS records are served by the external host.'
-                                : 'No records configured on ${widget.registrar.displayName}.',
+                            isFiltered
+                                ? 'No records of type $_typeFilter were found. Select "All" to view all records.'
+                                : (hasExternalNs
+                                    ? 'This domain uses external nameservers. Live DNS records could not be resolved from authoritative servers.'
+                                    : 'No records configured on ${widget.registrar.displayName}.'),
                             style: hh.body().copyWith(color: hh.textSecondary),
                             textAlign: TextAlign.center,
                           ),
+                          if (!isFiltered) ...[
+                            const SizedBox(height: HHSpacing.lg),
+                            AppPressable(
+                              onTap: _refresh,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: hh.bgElevated,
+                                  borderRadius: HHRadius.pillBr(),
+                                  border: Border.all(
+                                    color: hh.cardBorder.withValues(alpha: 0.8),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(LucideIcons.refreshCw, size: 14, color: hh.textPrimary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Refresh Live DNS',
+                                      style: hh.caption().copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -324,10 +405,31 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
                   ),
                 ),
                 if (r.proxied)
-                  const Icon(
-                    LucideIcons.cloud,
-                    color: Color(0xFFF6821F),
-                    size: 20,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF6821F).withValues(alpha: 0.12),
+                      borderRadius: HHRadius.pillBr(),
+                      border: Border.all(
+                        color: const Color(0xFFF6821F).withValues(alpha: 0.28),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.cloud, color: Color(0xFFF6821F), size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'Proxied',
+                          style: TextStyle(
+                            color: Color(0xFFF6821F),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),
@@ -371,6 +473,32 @@ class _DnsRecordsScreenState extends ConsumerState<DnsRecordsScreen> {
   }
 }
 
+bool _isRegistrarNameserver(RegistrarId registrar, String ns) {
+  final lower = ns.toLowerCase();
+  return switch (registrar) {
+    RegistrarId.godaddy =>
+      lower.contains('domaincontrol.com') ||
+      lower.contains('godaddy.com') ||
+      lower.contains('secureserver.net'),
+    RegistrarId.spaceship =>
+      lower.contains('spaceship.com') ||
+      lower.contains('registrar-servers.com'),
+    RegistrarId.porkbun =>
+      lower.contains('porkbun.com'),
+    RegistrarId.cloudflareregistrar =>
+      lower.contains('cloudflare.com'),
+    RegistrarId.namecom =>
+      lower.contains('name.com'),
+    RegistrarId.namesilo =>
+      lower.contains('namesilo.com') ||
+      lower.contains('dnsowl.com'),
+    RegistrarId.gandi =>
+      lower.contains('gandi.net'),
+    RegistrarId.dynadot =>
+      lower.contains('dynadot.com'),
+  };
+}
+
 class _DomainOverviewCard extends StatelessWidget {
   const _DomainOverviewCard({
     required this.domain,
@@ -383,6 +511,12 @@ class _DomainOverviewCard extends StatelessWidget {
   final RegistrarId registrar;
   final bool hasExternalNs;
   final HHTokens hh;
+
+  static DomainStatus _effectiveStatus(RegisteredDomain d) {
+    if (d.isExpired) return DomainStatus.expired;
+    if (d.isExpiringSoon) return DomainStatus.expiring;
+    return d.status;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -406,7 +540,7 @@ class _DomainOverviewCard extends StatelessWidget {
             children: [
               RegistrarBadge(registrarId: registrar, showLabel: true),
               const Spacer(),
-              DomainStatusPill(status: domain.status),
+              DomainStatusPill(status: _effectiveStatus(domain)),
             ],
           ),
 
@@ -446,7 +580,7 @@ class _DomainOverviewCard extends StatelessWidget {
 
           const SizedBox(height: HHSpacing.md),
 
-          // Status feature badges
+          // Status feature badges (proper pills)
           Wrap(
             spacing: HHSpacing.sm,
             runSpacing: HHSpacing.xs,
@@ -505,7 +639,7 @@ class _DomainOverviewCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'External nameservers active. DNS records are managed at the authoritative DNS provider.',
+                      'External nameservers active. Live DNS records are resolved from public authoritative DNS.',
                       style: hh.footnote().copyWith(color: hh.textTertiary, fontSize: 11),
                     ),
                   ),
@@ -535,23 +669,27 @@ class _FeatureBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: hh.bgElevated2,
-        borderRadius: BorderRadius.circular(6),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: HHRadius.pillBr(),
         border: Border.all(
-          color: hh.cardBorder.withValues(alpha: 0.5),
+          color: color.withValues(alpha: 0.28),
           width: 0.5,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: hh.caption().copyWith(fontSize: 11, color: hh.textSecondary),
+            style: hh.caption().copyWith(
+                  fontSize: 11,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
@@ -592,13 +730,52 @@ class _DnsRecordRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    record.name,
-                    style: hh.headline().copyWith(fontSize: 15),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          record.name,
+                          style: hh.headline().copyWith(fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (record.proxied) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6821F).withValues(alpha: 0.12),
+                            borderRadius: HHRadius.pillBr(),
+                            border: Border.all(
+                              color: const Color(0xFFF6821F).withValues(alpha: 0.28),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.cloud,
+                                color: Color(0xFFF6821F),
+                                size: 10,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Proxied',
+                                style: TextStyle(
+                                  color: Color(0xFFF6821F),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     record.content,
                     style: HHTextStyles.mono(hh.textSecondary).copyWith(fontSize: 13),
@@ -608,19 +785,25 @@ class _DnsRecordRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (record.proxied) ...[
-              const SizedBox(width: HHSpacing.xs),
-              const Icon(
-                LucideIcons.cloud,
-                color: Color(0xFFF6821F),
-                size: 16,
-              ),
-            ],
             const SizedBox(width: HHSpacing.sm),
-            Text(
-              record.isAutoTtl ? 'Auto' : (record.ttl != null ? '${record.ttl}s' : ''),
-              style: hh.footnote(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  record.isAutoTtl ? 'Auto' : (record.ttl != null ? '${record.ttl}s' : ''),
+                  style: hh.footnote().copyWith(fontSize: 11, color: hh.textTertiary),
+                ),
+                if (record.priority != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Prio ${record.priority}',
+                    style: hh.caption2().copyWith(color: hh.textTertiary),
+                  ),
+                ],
+              ],
             ),
+            const SizedBox(width: 4),
+            Icon(LucideIcons.chevronRight, size: 14, color: hh.textTertiary),
           ],
         ),
       ),
@@ -633,23 +816,42 @@ class _TypeBadge extends StatelessWidget {
   final String type;
   final HHTokens hh;
 
+  static Color colorForType(String type) => switch (type.toUpperCase()) {
+        'A'     => const Color(0xFF38BDF8),
+        'AAAA'  => const Color(0xFF60A5FA),
+        'CNAME' => const Color(0xFFA855F7),
+        'TXT'   => const Color(0xFFF59E0B),
+        'MX'    => const Color(0xFF10B981),
+        'NS'    => const Color(0xFFEC4899),
+        'SRV'   => const Color(0xFF818CF8),
+        'CAA'   => const Color(0xFF14B8A6),
+        _       => const Color(0xFF94A3B8),
+      };
+
   @override
   Widget build(BuildContext context) {
+    final c = colorForType(type);
     return Container(
-      width: 44,
-      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      constraints: const BoxConstraints(minWidth: 44),
       decoration: BoxDecoration(
-        color: hh.bgElevated2,
-        borderRadius: BorderRadius.circular(6),
+        color: c.withValues(alpha: 0.14),
+        borderRadius: HHRadius.pillBr(),
+        border: Border.all(
+          color: c.withValues(alpha: 0.28),
+          width: 0.5,
+        ),
       ),
       alignment: Alignment.center,
       child: Text(
         type.toUpperCase(),
-        style: HHTextStyles.mono(hh.textPrimary).copyWith(
+        style: HHTextStyles.mono(c).copyWith(
           fontSize: 11,
           fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
         ),
       ),
     );
   }
 }
+

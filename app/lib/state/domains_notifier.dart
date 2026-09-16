@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
+import '../core/network/dns_resolver.dart';
 import '../core/storage/db.dart';
 import '../core/storage/secure_store.dart';
 import '../models/connection.dart';
@@ -251,37 +252,60 @@ final dnsRecordsProvider = FutureProvider.family<
 
   // 2. Fetch live
   final connections = await ref.watch(connectionsProvider.future);
-  final connection = connections.firstWhere((c) => c.id == args.connectionId);
-  final credential = await SecureStore.instance.loadCredential(args.connectionId);
-  if (credential == null) return [];
-
-  final provider = registrarProviderFor(args.registrar);
-  final res = await provider.listDnsRecords(connection, credential, args.domain);
-
-  return res.when(
-    ok: (records) async {
-      // Update cache
-      final companions = records
-          .map((r) => DnsRecordsCacheCompanion.insert(
-                id: r.id,
-                connectionId: args.connectionId,
-                domain: args.domain,
-                type: r.type,
-                name: r.name,
-                content: r.content,
-                ttl: Value(r.ttl),
-                priority: Value(r.priority),
-                proxied: Value(r.proxied),
-                fetchedAt: DateTime.now().toUtc(),
-              ))
-          .toList();
-      await db.replaceDnsRecordsForDomain(
-        args.connectionId,
-        args.domain,
-        companions,
-      );
-      return records;
-    },
-    err: (_) => [],
+  final connection = connections.firstWhere(
+    (c) => c.id == args.connectionId,
+    orElse: () => Connection(
+      id: args.connectionId,
+      service: RegistrarRef(args.registrar),
+      displayName: args.registrar.displayName,
+    ),
   );
+  final credential = await SecureStore.instance.loadCredential(args.connectionId);
+
+  List<DnsRecord> records = [];
+
+  if (credential != null) {
+    final provider = registrarProviderFor(args.registrar);
+    final res = await provider.listDnsRecords(connection, credential, args.domain);
+    records = res.when(
+      ok: (r) => r,
+      err: (_) => [],
+    );
+  }
+
+  // If registrar returned empty or failed (e.g. external nameservers or no DNS zone on registrar),
+  // query live DNS-over-HTTPS (DoH) so user sees real live records!
+  if (records.isEmpty) {
+    try {
+      final live = await DnsResolver().resolveLiveRecords(args.domain);
+      if (live.isNotEmpty) {
+        records = live;
+      }
+    } catch (_) {}
+  }
+
+  if (records.isNotEmpty) {
+    // Update cache
+    final companions = records
+        .map((r) => DnsRecordsCacheCompanion.insert(
+              id: r.id,
+              connectionId: args.connectionId,
+              domain: args.domain,
+              type: r.type,
+              name: r.name,
+              content: r.content,
+              ttl: Value(r.ttl),
+              priority: Value(r.priority),
+              proxied: Value(r.proxied),
+              fetchedAt: DateTime.now().toUtc(),
+            ))
+        .toList();
+    await db.replaceDnsRecordsForDomain(
+      args.connectionId,
+      args.domain,
+      companions,
+    );
+  }
+
+  return records;
 });

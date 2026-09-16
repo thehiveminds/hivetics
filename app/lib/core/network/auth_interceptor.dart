@@ -36,7 +36,12 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    options.headers.addAll(credentialHeaders(credential));
+    final defHeaders = credentialHeaders(credential);
+    for (final entry in defHeaders.entries) {
+      if (!options.headers.containsKey(entry.key)) {
+        options.headers[entry.key] = entry.value;
+      }
+    }
     options.extra['_redactedAuth'] = true;
     handler.next(options);
   }

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hivehub/models/credential.dart';
 import 'package:hivehub/models/registered_domain.dart';
 import 'package:hivehub/models/registrar_id.dart';
 import 'package:hivehub/providers/provider_registry.dart';

@@ -26,11 +26,24 @@ class GoDaddyProvider implements RegistrarProvider {
   @override
   String get displayName => 'GoDaddy';
 
-  Dio _client(Credential credential) => buildClient(
-    baseUrl: _baseUrl,
-    credential: credential,
-    rateLimit: ProviderRateLimit.godaddy,
-  );
+  Dio _client(Credential credential) {
+    final Map<String, String> headers = {};
+    if (credential is KeyPairCredential) {
+      headers['Authorization'] =
+          'sso-key ${credential.apiKey.trim()}:${credential.secretKey.trim()}';
+    } else if (credential is BearerCredential) {
+      final t = credential.token.trim();
+      if (!t.startsWith('sso-key ') && !t.startsWith('Bearer ')) {
+        headers['Authorization'] = 'sso-key $t';
+      }
+    }
+    return buildClient(
+      baseUrl: _baseUrl,
+      credential: credential,
+      rateLimit: ProviderRateLimit.godaddy,
+      extraHeaders: headers,
+    );
+  }
 
   @override
   Future<Result<ValidatedAccount>> validate(Credential credential) async {

@@ -5,6 +5,7 @@ import '../core/storage/db.dart';
 import '../core/storage/secure_store.dart';
 import '../core/result.dart';
 import '../models/connection.dart';
+import '../models/service_ref.dart';
 import '../providers/provider_registry.dart';
 
 class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
@@ -39,7 +40,7 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
         final id = _uuid.v4();
         final connection = Connection(
           id: id,
-          providerId: providerId,
+          service: HostRef(providerId),
           displayName: account.displayName,
           accountId: account.accountId,
           accountName: account.displayName,
@@ -95,7 +96,8 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
 
   static Connection _rowToConnection(ConnectionsMetaData row) => Connection(
         id: row.id,
-        providerId: ProviderId.fromId(row.providerId),
+        // Every row is hosting-only until the drift v2 `kind` column lands.
+        service: HostRef(ProviderId.fromId(row.providerId)),
         displayName: row.displayName,
         accountId: row.accountId,
         lastSyncedAt: row.fetchedAt,
@@ -105,7 +107,7 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
   static ConnectionsMetaCompanion _connectionToCompanion(Connection c) =>
       ConnectionsMetaCompanion.insert(
         id: c.id,
-        providerId: c.providerId.id,
+        providerId: c.service.id,
         displayName: c.displayName,
         accountId: Value(c.accountId),
         fetchedAt: Value(c.lastSyncedAt),

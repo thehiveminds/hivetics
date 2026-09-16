@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hivehub/models/deploy_status.dart';
 import 'package:hivehub/models/deployment.dart';
 import 'package:hivehub/models/connection.dart';
+import 'package:hivehub/models/service_ref.dart';
 import 'package:hivehub/models/site.dart';
 import 'package:hivehub/models/site_alert.dart';
 
@@ -65,7 +66,7 @@ void main() {
     test('Alert computation: connection unauthorized produces tokenExpired alert', () {
       const unauthConnection = Connection(
         id: 'conn-1',
-        providerId: ProviderId.vercel,
+        service: HostRef(ProviderId.vercel),
         displayName: 'Vercel Team',
         lastError: 'UnauthorizedException',
       );
@@ -73,7 +74,9 @@ void main() {
 
       final alerts = <SiteAlert>[];
       if (unauthConnection.isUnauthorized) {
-        alerts.add(SiteAlert.tokenExpired(unauthConnection.providerId.displayName));
+        alerts.add(SiteAlert.tokenExpired(
+          (unauthConnection.service as HostRef).provider.displayName,
+        ));
       }
 
       expect(alerts.length, 1);

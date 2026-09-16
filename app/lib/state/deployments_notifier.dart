@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/storage/secure_store.dart';
 import '../models/deployment.dart';
 import '../models/connection.dart';
+import '../models/service_ref.dart';
 import '../providers/provider_registry.dart';
 import 'connections_notifier.dart';
 
@@ -22,10 +23,13 @@ class DeploymentsNotifier extends AsyncNotifier<List<Deployment>> {
     final all = <Deployment>[];
 
     await Future.wait(connections.map((c) async {
+      final host = c.service;
+      if (host is! HostRef) return;
+
       final token = await SecureStore.instance.loadCredential(c.id);
       if (token == null) return;
 
-      final provider = providerFor(c.providerId);
+      final provider = providerFor(host.provider);
 
       // List all projects first to get project IDs.
       final projectsResult = await provider.listProjects(c, token.token);
@@ -62,9 +66,11 @@ final projectDeploymentsProvider = FutureProvider.family<List<Deployment>, ({Str
   (ref, args) async {
     final connections = await ref.watch(connectionsProvider.future);
     final connection = connections.firstWhere((c) => c.id == args.connectionId);
+    final host = connection.service;
+    if (host is! HostRef) return [];
     final token = await SecureStore.instance.loadCredential(connection.id);
     if (token == null) return [];
-    final provider = providerFor(connection.providerId);
+    final provider = providerFor(host.provider);
     final result = await provider.listDeployments(
       connection,
       token.token,

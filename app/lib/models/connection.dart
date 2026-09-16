@@ -1,3 +1,5 @@
+import 'service_ref.dart';
+
 enum ProviderId {
   vercel('vercel', 'Vercel'),
   netlify('netlify', 'Netlify'),
@@ -14,7 +16,7 @@ enum ProviderId {
 class Connection {
   const Connection({
     required this.id,
-    required this.providerId,
+    required this.service,
     required this.displayName,
     this.accountId,
     this.accountName,
@@ -23,7 +25,7 @@ class Connection {
   });
 
   final String id;
-  final ProviderId providerId;
+  final ServiceRef service;
 
   final String displayName;
 
@@ -47,7 +49,7 @@ class Connection {
     bool clearError = false,
   }) => Connection(
     id: id,
-    providerId: providerId,
+    service: service,
     displayName: displayName ?? this.displayName,
     accountId: accountId ?? this.accountId,
     accountName: accountName ?? this.accountName,

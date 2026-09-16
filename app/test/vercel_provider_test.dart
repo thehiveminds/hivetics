@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hivehub/models/connection.dart';
+import 'package:hivehub/models/service_ref.dart';
 import 'package:hivehub/providers/hosting/status_normalizer.dart';
 import 'package:hivehub/providers/hosting/vercel_provider.dart';
 
@@ -31,7 +32,7 @@ void main() {
     test('Connection model with teamId vs personal account', () {
       final teamConn = Connection(
         id: 'conn-1',
-        providerId: ProviderId.vercel,
+        service: const HostRef(ProviderId.vercel),
         displayName: 'My Team',
         accountId: 'team_12345',
       );
@@ -39,7 +40,7 @@ void main() {
 
       final personalConn = Connection(
         id: 'conn-2',
-        providerId: ProviderId.vercel,
+        service: const HostRef(ProviderId.vercel),
         displayName: 'Personal',
         accountId: 'personal',
       );

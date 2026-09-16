@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/connection.dart';
 import '../../models/deploy_status.dart';
+import '../../models/service_ref.dart';
 import '../../shared/theme.dart';
 import '../../state/connections_notifier.dart';
 import '../../state/theme_notifier.dart';
@@ -153,8 +154,12 @@ class _ConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppListRow(
       title: connection.displayName,
-      subtitle: connection.providerId.displayName,
-      leadingWidget: ProviderBadge(providerId: connection.providerId),
+      subtitle: connection.service.displayName,
+      leadingWidget: switch (connection.service) {
+        HostRef(:final provider) => ProviderBadge(providerId: provider),
+        // Registrar badge lands with the Settings grouping in §5.6.
+        RegistrarRef() => const SizedBox(width: 18, height: 18),
+      },
       trailingWidget: connection.hasError
           ? AppStatusPill(
               status: connection.isUnauthorized
@@ -173,7 +178,7 @@ class _ConnectionRow extends StatelessWidget {
       context: context,
       builder: (_) => CupertinoActionSheet(
         title: Text(connection.displayName),
-        message: Text(connection.providerId.displayName),
+        message: Text(connection.service.displayName),
         actions: [
           CupertinoActionSheetAction(
             isDestructiveAction: true,

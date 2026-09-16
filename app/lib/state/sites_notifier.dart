@@ -3,6 +3,7 @@ import '../core/network/api_exception.dart';
 import '../core/storage/secure_store.dart';
 import '../models/connection.dart';
 import '../models/deploy_status.dart';
+import '../models/service_ref.dart';
 import '../models/site.dart';
 import '../models/site_alert.dart';
 import '../providers/provider_registry.dart';
@@ -66,6 +67,13 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
   }
 
   Future<ConnectionFetchResult> _fetchConnection(Connection c) async {
+    final host = c.service;
+    if (host is! HostRef) {
+      // Registrar-only connections never yield Sites; the merge engine
+      // (§6) joins their domains onto Sites instead.
+      return ConnectionFetchResult(connection: c);
+    }
+
     final token = await SecureStore.instance.loadCredential(c.id);
     if (token == null) {
       return ConnectionFetchResult(
@@ -74,7 +82,7 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
       );
     }
 
-    final provider = providerFor(c.providerId);
+    final provider = providerFor(host.provider);
     final projectsResult = await provider.listProjects(c, token.token);
 
     return projectsResult.when(
@@ -88,7 +96,7 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
 
           final alerts = <SiteAlert>[];
           if (c.isUnauthorized) {
-            alerts.add(SiteAlert.tokenExpired(c.providerId.displayName));
+            alerts.add(SiteAlert.tokenExpired(host.provider.displayName));
           } else if (project.latestDeployment?.status == DeployStatus.failed) {
             alerts.add(SiteAlert.buildFailed);
           }

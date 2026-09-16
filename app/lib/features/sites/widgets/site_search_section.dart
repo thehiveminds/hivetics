@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -55,7 +56,7 @@ class SiteSearchSection extends ConsumerWidget {
                 onTap: () {
                   HHHaptics.selectionClick();
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    CupertinoPageRoute<void>(
                       builder: (_) => GscPerformanceScreen(
                         connectionId: connection.id,
                         initialSiteUrl: siteUrlCandidate,
@@ -177,96 +178,112 @@ class _SearchSummaryCard extends ConsumerWidget {
 
     return reportAsync.when(
       data: (report) {
-        return AppPressable(
-          onTap: () {
-            HHHaptics.selectionClick();
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => GscPerformanceScreen(
-                  connectionId: connectionId,
-                  initialSiteUrl: effectiveSiteUrl,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppPressable(
+              onTap: () {
+                HHHaptics.selectionClick();
+                Navigator.of(context).push(
+                  CupertinoPageRoute<void>(
+                    builder: (_) => GscPerformanceScreen(
+                      connectionId: connectionId,
+                      initialSiteUrl: effectiveSiteUrl,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(HHSpacing.md),
+                decoration: BoxDecoration(
+                  color: hh.bgElevated,
+                  borderRadius: HHRadius.cardBr(),
+                  border: Border.all(
+                    color: hh.cardBorder.withValues(alpha: 0.8),
+                    width: 0.5,
+                  ),
+                  boxShadow: hh.cardShadow,
                 ),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(HHSpacing.md),
-            decoration: BoxDecoration(
-              color: hh.bgElevated,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: hh.cardBorder.withValues(alpha: 0.8)),
-              boxShadow: hh.cardShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const AnalyticsBadge(
-                          providerId: AnalyticsProviderId.gsc,
-                          size: 20,
+                        Row(
+                          children: [
+                            const AnalyticsBadge(
+                              providerId: AnalyticsProviderId.gsc,
+                              size: 20,
+                            ),
+                            const SizedBox(width: HHSpacing.xs),
+                            Text(
+                              'Last 28 Days',
+                              style: hh.caption().copyWith(color: hh.textSecondary),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: HHSpacing.xs),
-                        Text(
-                          'Last 28 Days',
-                          style: hh.caption().copyWith(color: hh.textSecondary),
+                        Icon(
+                          LucideIcons.chevronRight,
+                          size: 16,
+                          color: hh.textTertiary,
                         ),
                       ],
                     ),
-                    Icon(
-                      LucideIcons.chevronRight,
-                      size: 16,
-                      color: hh.textTertiary,
+                    const SizedBox(height: HHSpacing.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _kpi(
+                          'Clicks',
+                          NumberFormat.compact().format(report.totalClicks),
+                          const Color(0xFF4285F4),
+                          hh,
+                        ),
+                        _kpi(
+                          'Impressions',
+                          NumberFormat.compact().format(report.totalImpressions),
+                          const Color(0xFF8B5CF6),
+                          hh,
+                        ),
+                        _kpi(
+                          'Avg CTR',
+                          '${(report.averageCtr * 100).toStringAsFixed(1)}%',
+                          const Color(0xFF10B981),
+                          hh,
+                        ),
+                        _kpi(
+                          'Avg Pos',
+                          report.averagePosition.toStringAsFixed(1),
+                          const Color(0xFFF59E0B),
+                          hh,
+                        ),
+                      ],
                     ),
+                    if (report.topQueries.isNotEmpty) ...[
+                      const SizedBox(height: HHSpacing.md),
+                      Divider(height: 0.5, thickness: 0.5, color: hh.separator),
+                      const SizedBox(height: HHSpacing.sm),
+                      Text(
+                        'Top query: "${report.topQueries.first.query}" · ${report.topQueries.first.clicks} clicks',
+                        style: hh.footnote().copyWith(color: hh.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: HHSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _kpi(
-                      'Clicks',
-                      NumberFormat.compact().format(report.totalClicks),
-                      const Color(0xFF4285F4),
-                      hh,
-                    ),
-                    _kpi(
-                      'Impressions',
-                      NumberFormat.compact().format(report.totalImpressions),
-                      const Color(0xFF8B5CF6),
-                      hh,
-                    ),
-                    _kpi(
-                      'Avg CTR',
-                      '${(report.averageCtr * 100).toStringAsFixed(1)}%',
-                      const Color(0xFF10B981),
-                      hh,
-                    ),
-                    _kpi(
-                      'Avg Pos',
-                      report.averagePosition.toStringAsFixed(1),
-                      const Color(0xFFF59E0B),
-                      hh,
-                    ),
-                  ],
-                ),
-                if (report.topQueries.isNotEmpty) ...[
-                  const SizedBox(height: HHSpacing.md),
-                  Divider(height: 0.5, thickness: 0.5, color: hh.separator),
-                  const SizedBox(height: HHSpacing.sm),
-                  Text(
-                    'Top query: "${report.topQueries.first.query}" · ${report.topQueries.first.clicks} clicks',
-                    style: hh.footnote().copyWith(color: hh.textSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                'Search Console data lags 2–3 days',
+                style: hh.footnote().copyWith(color: hh.textTertiary),
+              ),
+            ),
+          ],
         );
       },
       loading: () => const AppSkeleton(height: 110),
@@ -274,8 +291,8 @@ class _SearchSummaryCard extends ConsumerWidget {
         padding: const EdgeInsets.all(HHSpacing.md),
         decoration: BoxDecoration(
           color: hh.bgElevated,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: hh.cardBorder),
+          borderRadius: HHRadius.cardBr(),
+          border: Border.all(color: hh.cardBorder, width: 0.5),
         ),
         child: Row(
           children: [
@@ -307,7 +324,8 @@ class _SearchSummaryCard extends ConsumerWidget {
         const SizedBox(height: 2),
         Text(
           value,
-          style: hh.headline().copyWith(
+          style: hh.metric().copyWith(
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: color,
               ),

@@ -84,10 +84,15 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
           AppNavBar(
             title: 'Search Console',
             trailing: [
-              IconButton(
-                icon: Icon(LucideIcons.searchCode, color: hh.accent, size: 20),
-                tooltip: 'Inspect URL',
-                onPressed: () => _showInspectionSheet(context),
+              AppPressable(
+                onTap: () => _showInspectionSheet(context),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Icon(LucideIcons.searchCode, color: hh.accent, size: 20),
+                  ),
+                ),
               ),
             ],
           ),
@@ -526,9 +531,9 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
               fit: BoxFit.scaleDown,
               child: Text(
                 value,
-                style: hh.title2().copyWith(
+                style: hh.metric().copyWith(
+                      fontSize: 20,
                       color: isSelected ? metric.color : hh.textPrimary,
-                      fontWeight: FontWeight.w700,
                     ),
               ),
             ),
@@ -679,8 +684,11 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
     return Container(
       decoration: BoxDecoration(
         color: hh.bgElevated,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: hh.cardBorder.withValues(alpha: 0.8)),
+        borderRadius: HHRadius.cardBr(),
+        border: Border.all(
+          color: hh.cardBorder.withValues(alpha: 0.8),
+          width: 0.5,
+        ),
       ),
       child: Column(
         children: [
@@ -762,6 +770,7 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF4285F4),
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                     ),
                   ),
@@ -770,7 +779,10 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
                     child: Text(
                       NumberFormat.compact().format(items[i].impressions),
                       textAlign: TextAlign.right,
-                      style: hh.body().copyWith(fontSize: 13),
+                      style: hh.body().copyWith(
+                            fontSize: 13,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                     ),
                   ),
                   SizedBox(
@@ -778,7 +790,10 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
                     child: Text(
                       '${(items[i].ctr * 100).toStringAsFixed(1)}%',
                       textAlign: TextAlign.right,
-                      style: hh.caption().copyWith(color: hh.textSecondary),
+                      style: hh.caption().copyWith(
+                            color: hh.textSecondary,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                     ),
                   ),
                   SizedBox(
@@ -786,7 +801,10 @@ class _GscPerformanceScreenState extends ConsumerState<GscPerformanceScreen> {
                     child: Text(
                       items[i].position.toStringAsFixed(1),
                       textAlign: TextAlign.right,
-                      style: hh.caption().copyWith(color: hh.textSecondary),
+                      style: hh.caption().copyWith(
+                            color: hh.textSecondary,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                     ),
                   ),
                 ],

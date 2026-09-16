@@ -8,6 +8,7 @@ import '../../../models/project_analytics.dart';
 import '../../../models/site.dart';
 import '../../../shared/theme.dart';
 import '../../../state/project_analytics_notifier.dart';
+import '../../../widgets/app_pressable.dart';
 import '../../../widgets/charts/cache_hit_bar.dart';
 import '../../../widgets/charts/ios_trend_chart.dart';
 import '../../../widgets/skeleton.dart';
@@ -386,9 +387,8 @@ class _MetricTile extends StatelessWidget {
         ? activeColor.withValues(alpha: 0.1)
         : hh.bgBase.withValues(alpha: 0.4);
 
-    return GestureDetector(
+    return AppPressable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
@@ -429,9 +429,9 @@ class _MetricTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value,
-              style: hh.title2().copyWith(
+              style: hh.metric().copyWith(
+                    fontSize: 22,
                     color: hh.textPrimary,
-                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.3,
                   ),
             ),
@@ -462,12 +462,20 @@ class _DeltaBadge extends StatelessWidget {
 
     final sign = delta > 0 ? '↑ +' : (delta < 0 ? '↓ ' : '');
 
-    return Text(
-      '$sign${delta.abs().toStringAsFixed(1)}%',
-      style: hh.caption2().copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '$sign${delta.abs().toStringAsFixed(1)}%',
+        style: hh.caption2().copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+      ),
     );
   }
 }
@@ -511,7 +519,7 @@ class _NoticeBanner extends StatelessWidget {
             ),
           ),
           if (site.hostProject != null)
-            GestureDetector(
+            AppPressable(
               onTap: () => launchUrl(
                 Uri.parse('${site.hostProject!.dashboardUrl()}/analytics'),
                 mode: LaunchMode.externalApplication,

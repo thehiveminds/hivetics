@@ -2,6 +2,7 @@
 
 import 'project.dart';
 import 'deployment.dart';
+import 'registered_domain.dart';
 import 'site_alert.dart';
 
 class Site {
@@ -30,12 +31,11 @@ class Site {
 
   final List<SiteAlert> alerts;
 
-  final dynamic registration;
+  final RegisteredDomain? registration;
 
   final String? gscSiteUrl;
   final String? ga4PropertyId;
   final String? clarityProjectId;
-
 
   bool get hasAlerts => alerts.isNotEmpty;
 
@@ -48,6 +48,8 @@ class Site {
     List<SiteAlert>? alerts,
     Deployment? latestDeployment,
     Project? hostProject,
+    RegisteredDomain? registration,
+    bool clearRegistration = false,
   }) =>
       Site(
         id: id,
@@ -56,7 +58,9 @@ class Site {
         hostProject: hostProject ?? this.hostProject,
         latestDeployment: latestDeployment ?? this.latestDeployment,
         alerts: alerts ?? this.alerts,
-        registration: registration,
+        registration: clearRegistration
+            ? null
+            : (registration ?? this.registration),
         gscSiteUrl: gscSiteUrl,
         ga4PropertyId: ga4PropertyId,
         clarityProjectId: clarityProjectId,

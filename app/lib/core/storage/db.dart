@@ -11,15 +11,57 @@ part 'db.g.dart';
 /// Connection metadata — never the credential itself.
 class ConnectionsMeta extends Table {
   TextColumn get id => text()();
-  TextColumn get providerId => text()(); // e.g. 'vercel'
+  TextColumn get providerId => text()(); // e.g. 'vercel' or 'godaddy'
   TextColumn get displayName => text()();
   TextColumn get accountId => text().nullable()();
   DateTimeColumn get fetchedAt => dateTime().nullable()();
   TextColumn get lastError =>
       text().nullable()(); // serialised ApiException type
 
+  /// 'hosting' | 'registrar' — distinguishes a HostRef from a RegistrarRef
+  /// connection (§3.1). Existing v1 rows migrate to 'hosting' with no
+  /// backfill needed.
+  TextColumn get kind => text().withDefault(const Constant('hosting'))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Cached registrar domains — read-through, since registrar data changes on
+/// a scale of months and GoDaddy/Porkbun both cap monthly call volume.
+/// Row class renamed to avoid colliding with the `RegisteredDomain` model.
+@DataClassName('RegisteredDomainRow')
+class RegisteredDomains extends Table {
+  TextColumn get domain => text()(); // normalized apex — the join key
+  TextColumn get connectionId => text()();
+  TextColumn get registrarId => text()();
+  TextColumn get rawStatus => text().nullable()();
+  DateTimeColumn get expiresAt => dateTime().nullable()();
+  BoolColumn get autoRenew => boolean().nullable()();
+  BoolColumn get locked => boolean().nullable()();
+  BoolColumn get privacy => boolean().nullable()();
+  TextColumn get nameServers => text()(); // JSON array
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {domain, connectionId};
+}
+
+/// Cached DNS records for a registrar-managed domain.
+class DnsRecordsCache extends Table {
+  TextColumn get id => text()();
+  TextColumn get connectionId => text()();
+  TextColumn get domain => text()();
+  TextColumn get type => text()();
+  TextColumn get name => text()();
+  TextColumn get content => text()();
+  IntColumn get ttl => integer().nullable()();
+  IntColumn get priority => integer().nullable()();
+  BoolColumn get proxied => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id, connectionId};
 }
 
 /// Cached host projects.
@@ -79,14 +121,37 @@ class SiteLinks extends Table {
 }
 
 @DriftDatabase(
-  tables: [ConnectionsMeta, Projects, ProjectDomains, Deployments, SiteLinks],
+  tables: [
+    ConnectionsMeta,
+    Projects,
+    ProjectDomains,
+    Deployments,
+    SiteLinks,
+    RegisteredDomains,
+    DnsRecordsCache,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          // The registrar cache is disposable — v1 predates it entirely,
+          // and this path has never executed in production, so there is
+          // nothing worth preserving beyond a straight additive upgrade.
+          if (from < 2) {
+            await m.addColumn(connectionsMeta, connectionsMeta.kind);
+            await m.createTable(registeredDomains);
+            await m.createTable(dnsRecordsCache);
+          }
+        },
+      );
 
   Future<List<ConnectionsMetaData>> allConnections() =>
       select(connectionsMeta).get();
@@ -147,7 +212,59 @@ class AppDatabase extends _$AppDatabase {
     await deleteConnection(connectionId);
     await deleteProjectsForConnection(connectionId);
     await deleteDeploymentsForConnection(connectionId);
+    await deleteRegisteredDomainsForConnection(connectionId);
+    await deleteDnsRecordsForConnection(connectionId);
   });
+
+  // ── Registrar cache (§4) ──────────────────────────────────────────────
+
+  Future<List<RegisteredDomainRow>> allRegisteredDomains() =>
+      select(registeredDomains).get();
+
+  Future<void> upsertRegisteredDomain(RegisteredDomainsCompanion entry) =>
+      into(registeredDomains).insertOnConflictUpdate(entry);
+
+  Future<void> deleteRegisteredDomainsForConnection(String connectionId) =>
+      (delete(registeredDomains)
+            ..where((t) => t.connectionId.equals(connectionId)))
+          .go();
+
+  Future<List<DnsRecordsCacheData>> dnsRecordsForDomain(
+    String connectionId,
+    String domain,
+  ) =>
+      (select(dnsRecordsCache)
+            ..where(
+              (t) =>
+                  t.connectionId.equals(connectionId) & t.domain.equals(domain),
+            ))
+          .get();
+
+  Future<void> upsertDnsRecord(DnsRecordsCacheCompanion entry) =>
+      into(dnsRecordsCache).insertOnConflictUpdate(entry);
+
+  Future<void> replaceDnsRecordsForDomain(
+    String connectionId,
+    String domain,
+    List<DnsRecordsCacheCompanion> entries,
+  ) =>
+      transaction(() async {
+        await (delete(dnsRecordsCache)
+              ..where(
+                (t) =>
+                    t.connectionId.equals(connectionId) &
+                    t.domain.equals(domain),
+              ))
+            .go();
+        for (final entry in entries) {
+          await into(dnsRecordsCache).insertOnConflictUpdate(entry);
+        }
+      });
+
+  Future<void> deleteDnsRecordsForConnection(String connectionId) =>
+      (delete(dnsRecordsCache)
+            ..where((t) => t.connectionId.equals(connectionId)))
+          .go();
 }
 
 LazyDatabase _openConnection() {

@@ -571,7 +571,7 @@ class _TokenEntry extends StatelessWidget {
         ProviderId.netlify =>
           '1. Go to app.netlify.com → Avatar → User settings\n2. Navigate to Applications → Personal access tokens\n3. Click "New access token" and set an expiration\n4. Copy the generated token',
         ProviderId.cloudflarepages =>
-          '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Click "Create Token" → Custom token\n3. Permissions: Account · Cloudflare Pages · Read, Zone · DNS · Read\n4. Copy the token',
+          '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Click "Create Token" → Custom token\n3. Add 4 permissions: Account·Account Settings·Read, Account·Cloudflare Pages·Read, Account·Registrar Domains·Read, Zone·DNS·Read (All zones)\n4. Copy the token\n\nThis one token also powers the Domains tab if you use Cloudflare Registrar — no second connection needed.',
       };
 }
 

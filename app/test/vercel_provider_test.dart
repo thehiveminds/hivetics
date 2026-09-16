@@ -17,8 +17,14 @@ void main() {
 
     test('normalizeUrl prepends https:// if scheme is missing', () {
       expect(normalizeUrl('app.vercel.app'), equals('https://app.vercel.app'));
-      expect(normalizeUrl('https://app.vercel.app'), equals('https://app.vercel.app'));
-      expect(normalizeUrl('http://app.vercel.app'), equals('http://app.vercel.app'));
+      expect(
+        normalizeUrl('https://app.vercel.app'),
+        equals('https://app.vercel.app'),
+      );
+      expect(
+        normalizeUrl('http://app.vercel.app'),
+        equals('http://app.vercel.app'),
+      );
       expect(normalizeUrl(null), isNull);
       expect(normalizeUrl(''), isNull);
     });
@@ -30,17 +36,17 @@ void main() {
     });
 
     test('Connection model with teamId vs personal account', () {
-      final teamConn = Connection(
+      const teamConn = Connection(
         id: 'conn-1',
-        service: const HostRef(ProviderId.vercel),
+        service: HostRef(ProviderId.vercel),
         displayName: 'My Team',
         accountId: 'team_12345',
       );
       expect(teamConn.accountId?.startsWith('team_'), isTrue);
 
-      final personalConn = Connection(
+      const personalConn = Connection(
         id: 'conn-2',
-        service: const HostRef(ProviderId.vercel),
+        service: HostRef(ProviderId.vercel),
         displayName: 'Personal',
         accountId: 'personal',
       );

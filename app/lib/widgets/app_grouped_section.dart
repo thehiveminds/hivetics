@@ -6,12 +6,16 @@ class AppGroupedSection extends StatelessWidget {
     super.key,
     required this.children,
     this.header,
+    this.headerColor,
     this.footer,
     this.margin = const EdgeInsets.symmetric(horizontal: HHSpacing.screenPadding),
   });
 
   /// Optional UPPERCASE caption2 / textTertiary header above the container.
   final String? header;
+
+  /// Optional color override for the header.
+  final Color? headerColor;
 
   /// Optional footnote / textTertiary footer below the container.
   final String? footer;
@@ -35,7 +39,7 @@ class AppGroupedSection extends StatelessWidget {
             ),
             child: Text(
               header!.toUpperCase(),
-              style: hh.caption2(),
+              style: hh.caption2().copyWith(color: headerColor),
             ),
           ),
         ],

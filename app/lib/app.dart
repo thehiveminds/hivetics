@@ -6,6 +6,7 @@ import 'shared/theme.dart';
 import 'state/theme_notifier.dart';
 import 'features/sites/sites_screen.dart';
 import 'features/deploys/deploys_screen.dart';
+import 'features/domains/domains_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'widgets/bottom_tab_bar.dart';
 
@@ -37,10 +38,10 @@ class _RootShell extends StatefulWidget {
 class _RootShellState extends State<_RootShell> {
   int _index = 0;
 
-
   static const _screens = [
     SitesScreen(),
     DeploysScreen(),
+    DomainsScreen(),
     SettingsScreen(),
   ];
 

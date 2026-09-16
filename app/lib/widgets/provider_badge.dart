@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/connection.dart';
+import '../models/registrar_id.dart';
 import '../shared/theme.dart';
 
 class ProviderBadge extends StatelessWidget {
@@ -76,6 +77,83 @@ class ProviderBadge extends StatelessWidget {
             fg: Color(0xFFFFFFFF),
           ),
         ProviderId.cloudflarepages => const _BadgeConfig(
+            svgPath: 'assets/icons/cloudflare.svg',
+            fallbackIcon: LucideIcons.cloud,
+            bg: HHColors.cloudflareBg,
+            fg: Color(0xFFFFFFFF),
+          ),
+      };
+}
+
+class RegistrarBadge extends StatelessWidget {
+  const RegistrarBadge({
+    super.key,
+    required this.registrarId,
+    this.size = 18,
+    this.showLabel = false,
+  });
+
+  final RegistrarId registrarId;
+  final double size;
+  final bool showLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final hh = context.hh;
+    final config = _config(registrarId, hh);
+    final alwaysLabel =
+        registrarId == RegistrarId.cloudflareregistrar || showLabel;
+
+    final badge = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: config.bg,
+        borderRadius: BorderRadius.circular(HHRadius.providerBadge),
+      ),
+      alignment: Alignment.center,
+      child: SvgPicture.asset(
+        config.svgPath,
+        width: size * 0.65,
+        height: size * 0.65,
+        colorFilter: ColorFilter.mode(config.fg, BlendMode.srcIn),
+        placeholderBuilder: (_) => Icon(
+          config.fallbackIcon,
+          size: size * 0.65,
+          color: config.fg,
+        ),
+      ),
+    );
+
+    if (!alwaysLabel) return badge;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        badge,
+        const SizedBox(width: HHSpacing.xs),
+        Text(
+          registrarId.displayName,
+          style: HHTextStyles.caption(hh.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  static _BadgeConfig _config(RegistrarId id, HHTokens hh) => switch (id) {
+        RegistrarId.godaddy => const _BadgeConfig(
+            svgPath: 'assets/icons/godaddy.svg',
+            fallbackIcon: LucideIcons.globe,
+            bg: Color(0xFF1BDBDB),
+            fg: Color(0xFF000000),
+          ),
+        RegistrarId.porkbun => const _BadgeConfig(
+            svgPath: 'assets/icons/porkbun.svg',
+            fallbackIcon: LucideIcons.globe,
+            bg: Color(0xFFEF7878),
+            fg: Color(0xFFFFFFFF),
+          ),
+        RegistrarId.cloudflareregistrar => const _BadgeConfig(
             svgPath: 'assets/icons/cloudflare.svg',
             fallbackIcon: LucideIcons.cloud,
             bg: HHColors.cloudflareBg,

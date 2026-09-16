@@ -15,10 +15,11 @@ void main() {
     // Initial pump
     await tester.pump();
 
-    // Verify bottom tab bar is present with 3 tabs
+    // Verify bottom tab bar is present with 4 tabs
     expect(find.byType(BottomTabBar), findsOneWidget);
     expect(find.text('Sites'), findsWidgets);
     expect(find.text('Deploys'), findsWidgets);
+    expect(find.text('Domains'), findsWidgets);
     expect(find.text('Settings'), findsWidgets);
   });
 }

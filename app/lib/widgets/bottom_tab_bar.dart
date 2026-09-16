@@ -19,6 +19,7 @@ class BottomTabBar extends StatelessWidget {
   static const _tabs = [
     _TabItem(icon: LucideIcons.layoutGrid, label: 'Sites'),
     _TabItem(icon: LucideIcons.gitBranch, label: 'Deploys'),
+    _TabItem(icon: LucideIcons.globe, label: 'Domains'),
     _TabItem(icon: LucideIcons.settings, label: 'Settings'),
   ];
 

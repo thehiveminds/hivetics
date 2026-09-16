@@ -3,8 +3,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/registered_domain.dart';
 import '../../models/site.dart';
 import '../../models/deployment.dart';
 import '../../shared/formatters.dart';
@@ -14,9 +16,11 @@ import '../../widgets/app_nav_bar.dart';
 import '../../widgets/app_grouped_section.dart';
 import '../../widgets/app_list_row.dart';
 import '../../widgets/app_status_pill.dart';
+import '../../widgets/provider_badge.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/copyable_value.dart';
 import '../deploys/deployment_detail_screen.dart';
+import '../dns/dns_records_screen.dart';
 import 'site_deployments_screen.dart';
 
 class SiteDetailScreen extends ConsumerWidget {
@@ -91,6 +95,15 @@ class SiteDetailScreen extends ConsumerWidget {
 
                 const SizedBox(height: HHSpacing.xl),
 
+                if (site.registration != null) ...[
+                  _domainSection(
+                    context: context,
+                    hh: hh,
+                    reg: site.registration!,
+                  ),
+                  const SizedBox(height: HHSpacing.xl),
+                ],
+
                 if (project != null)
                   AppGroupedSection(
                     header: 'Links',
@@ -132,6 +145,88 @@ class SiteDetailScreen extends ConsumerWidget {
     return AppGroupedSection(
       header: 'Deployments',
       children: children,
+    );
+  }
+
+  Widget _domainSection({
+    required BuildContext context,
+    required HHTokens hh,
+    required RegisteredDomain reg,
+  }) {
+    final days = reg.daysUntilExpiry;
+    final expColor = reg.isExpired
+        ? hh.statusFailed
+        : (reg.isExpiringSoon ? hh.statusQueued : hh.textSecondary);
+    final expiryFormatted = reg.expiresAt != null
+        ? DateFormat('d MMM yyyy').format(reg.expiresAt!.toLocal())
+        : '—';
+    final expirySubtitle = days != null
+        ? '$expiryFormatted (${daysUntilExpiry(days)})'
+        : expiryFormatted;
+
+    return AppGroupedSection(
+      header: 'Domain',
+      headerColor: reg.isExpired
+          ? hh.statusFailed
+          : (reg.isExpiringSoon ? hh.statusQueued : null),
+      children: [
+        AppListRow(
+          title: reg.domain,
+          leadingWidget: RegistrarBadge(registrarId: reg.registrar),
+          trailingValue: reg.registrar.displayName,
+        ),
+        AppListRow(
+          title: 'Expires',
+          trailingWidget: Text(
+            expirySubtitle,
+            style: hh.body().copyWith(
+                  color: expColor,
+                  fontSize: 14,
+                ),
+          ),
+        ),
+        if (reg.autoRenew != null)
+          AppListRow(
+            title: 'Auto-renew',
+            trailingWidget: Text(
+              reg.autoRenew! ? 'On' : 'Off',
+              style: hh.body().copyWith(
+                    color: (!reg.autoRenew! && days != null && days <= 60)
+                        ? hh.statusQueued
+                        : hh.textSecondary,
+                    fontSize: 14,
+                    fontWeight: (!reg.autoRenew! && days != null && days <= 60)
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+            ),
+          ),
+        if (reg.locked != null)
+          AppListRow(
+            title: 'Transfer lock',
+            trailingValue: reg.locked! ? 'Locked' : 'Unlocked',
+          ),
+        if (reg.nameServers.isNotEmpty)
+          AppListRow(
+            title: 'Nameservers',
+            subtitle: reg.nameServers.join(', '),
+          ),
+        AppListRow(
+          title: 'DNS records',
+          leadingIcon: LucideIcons.globe,
+          leadingIconColor: hh.accent,
+          showChevron: true,
+          onTap: () => Navigator.of(context).push(
+            CupertinoPageRoute<void>(
+              builder: (_) => DnsRecordsScreen(
+                connectionId: reg.connectionId,
+                domain: reg.domain,
+                registrar: reg.registrar,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

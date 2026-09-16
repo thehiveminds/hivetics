@@ -5,8 +5,11 @@ import '../core/storage/db.dart';
 import '../core/storage/secure_store.dart';
 import '../core/result.dart';
 import '../models/connection.dart';
+import '../models/credential.dart';
+import '../models/registrar_id.dart';
 import '../models/service_ref.dart';
 import '../providers/provider_registry.dart';
+import 'domains_notifier.dart';
 
 class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
   static const _uuid = Uuid();
@@ -60,6 +63,42 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
     );
   }
 
+  /// Validate registrar credentials, then persist to drift + secure storage.
+  Future<Result<Connection>> addRegistrarConnection({
+    required RegistrarId registrarId,
+    required Credential credential,
+    String? selectedAccountId,
+  }) async {
+    final provider = registrarProviderFor(registrarId);
+    final validationResult = await provider.validate(credential);
+
+    return validationResult.when(
+      ok: (account) async {
+        final id = _uuid.v4();
+        final connection = Connection(
+          id: id,
+          service: RegistrarRef(registrarId),
+          displayName: account.displayName,
+          accountId: account.accountId,
+          accountName: account.displayName,
+        );
+
+        final db = ref.read(dbProvider);
+        await db.upsertConnection(_connectionToCompanion(connection));
+        await SecureStore.instance.saveCredential(id, credential);
+
+        // Invalidate domains provider so domains are fetched for this new connection
+        ref.invalidate(domainsProvider);
+
+        final updated = await _loadFromDb();
+        state = AsyncData(updated);
+
+        return Ok(connection);
+      },
+      err: (e) => Err(e),
+    );
+  }
+
   /// Purges token from SecureStore and all rows from drift in one transaction.
   Future<void> deleteConnection(String connectionId) async {
     final db = ref.read(dbProvider);
@@ -94,15 +133,19 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
     }
   }
 
-  static Connection _rowToConnection(ConnectionsMetaData row) => Connection(
-        id: row.id,
-        // Every row is hosting-only until the drift v2 `kind` column lands.
-        service: HostRef(ProviderId.fromId(row.providerId)),
-        displayName: row.displayName,
-        accountId: row.accountId,
-        lastSyncedAt: row.fetchedAt,
-        lastError: row.lastError,
-      );
+  static Connection _rowToConnection(ConnectionsMetaData row) {
+    final ServiceRef service = row.kind == 'registrar'
+        ? RegistrarRef(RegistrarId.fromId(row.providerId))
+        : HostRef(ProviderId.fromId(row.providerId));
+    return Connection(
+      id: row.id,
+      service: service,
+      displayName: row.displayName,
+      accountId: row.accountId,
+      lastSyncedAt: row.fetchedAt,
+      lastError: row.lastError,
+    );
+  }
 
   static ConnectionsMetaCompanion _connectionToCompanion(Connection c) =>
       ConnectionsMetaCompanion.insert(
@@ -112,6 +155,7 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
         accountId: Value(c.accountId),
         fetchedAt: Value(c.lastSyncedAt),
         lastError: Value(c.lastError),
+        kind: Value(c.service is RegistrarRef ? 'registrar' : 'hosting'),
       );
 }
 

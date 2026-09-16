@@ -10,6 +10,7 @@ import '../../models/deploy_status.dart';
 import '../../models/service_ref.dart';
 import '../../shared/theme.dart';
 import '../../state/connections_notifier.dart';
+import '../../state/domains_notifier.dart';
 import '../../state/theme_notifier.dart';
 import '../../widgets/app_nav_bar.dart';
 import '../../widgets/app_grouped_section.dart';
@@ -38,24 +39,56 @@ class SettingsScreen extends ConsumerWidget {
               connectionsAsync.when(
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
-                data: (connections) => AppGroupedSection(
-                  header: 'Connections',
-                  children: [
-                    ...connections.map(
-                      (c) => _ConnectionRow(connection: c, hh: hh, ref: ref),
-                    ),
-                    AppListRow(
-                      title: 'Add connection',
-                      leadingIcon: LucideIcons.plus,
-                      leadingIconColor: hh.accent,
-                      onTap: () => showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => const AddConnectionSheet(),
+                data: (connections) {
+                  final hosts = connections
+                      .where((c) => c.service is HostRef)
+                      .toList();
+                  final registrars = connections
+                      .where((c) => c.service is RegistrarRef)
+                      .toList();
+
+                  return Column(
+                    children: [
+                      AppGroupedSection(
+                        header: 'Hosting',
+                        children: [
+                          ...hosts.map(
+                            (c) => _ConnectionRow(
+                              connection: c,
+                              hh: hh,
+                              ref: ref,
+                            ),
+                          ),
+                          AppListRow(
+                            title: 'Add connection',
+                            leadingIcon: LucideIcons.plus,
+                            leadingIconColor: hh.accent,
+                            onTap: () => showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (_) => const AddConnectionSheet(),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
+                      if (registrars.isNotEmpty) ...[
+                        const SizedBox(height: HHSpacing.xl),
+                        AppGroupedSection(
+                          header: 'Registrars',
+                          children: registrars
+                              .map(
+                                (c) => _ConnectionRow(
+                                  connection: c,
+                                  hh: hh,
+                                  ref: ref,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: HHSpacing.xl),
@@ -152,13 +185,26 @@ class _ConnectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final domainsState = ref.watch(domainsProvider).valueOrNull;
+    String subtitle = connection.service.displayName;
+
+    if (connection.service is RegistrarRef) {
+      final match = domainsState?.results
+          .where((r) => r.connection.id == connection.id)
+          .firstOrNull;
+      if (match != null) {
+        final count = match.domains.length;
+        subtitle = '$count ${count == 1 ? "domain" : "domains"}';
+      }
+    }
+
     return AppListRow(
       title: connection.displayName,
-      subtitle: connection.service.displayName,
+      subtitle: subtitle,
       leadingWidget: switch (connection.service) {
         HostRef(:final provider) => ProviderBadge(providerId: provider),
-        // Registrar badge lands with the Settings grouping in §5.6.
-        RegistrarRef() => const SizedBox(width: 18, height: 18),
+        RegistrarRef(:final registrar) =>
+          RegistrarBadge(registrarId: registrar),
       },
       trailingWidget: connection.hasError
           ? AppStatusPill(

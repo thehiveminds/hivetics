@@ -1,15 +1,21 @@
+// MIT Licence — TheHiveMinds / Hivetics
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/connection.dart';
+import '../../models/credential.dart';
+import '../../models/registrar_id.dart';
 import '../../providers/hosting/hosting_provider.dart';
 import '../../providers/provider_registry.dart';
 import '../../shared/haptics.dart';
 import '../../shared/theme.dart';
+import '../../shared/window_security.dart';
 import '../../state/connections_notifier.dart';
+import '../../state/domains_notifier.dart';
 import '../../state/sites_notifier.dart';
 import '../../widgets/app_pressable.dart';
 import '../../widgets/primary_button.dart';
@@ -22,26 +28,61 @@ class AddConnectionSheet extends ConsumerStatefulWidget {
   ConsumerState<AddConnectionSheet> createState() => _AddConnectionSheetState();
 }
 
-enum _Step { pickProvider, enterToken, validating, pickAccount, nameIt }
+enum _Step { pickCategory, pickProvider, enterToken, validating, pickAccount, nameIt }
+enum _Category { hosting, registrar }
 
 class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
-  _Step _step = _Step.pickProvider;
-  ProviderId? _provider;
+  _Step _step = _Step.pickCategory;
+  _Category _category = _Category.hosting;
+  ProviderId? _hostingProvider;
+  RegistrarId? _registrarProvider;
+
   String _token = '';
+  String _secretKey = '';
   bool _tokenObscured = true;
+  bool _secretObscured = true;
+
   List<AccountOption>? _accountOptions;
   String? _selectedAccountId;
   String? _errorMessage;
   String? _createdConnectionId;
 
   final _tokenController = TextEditingController();
+  final _secretController = TextEditingController();
   final _nameController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Enable FLAG_SECURE to prevent screenshots of tokens and secret keys
+    WindowSecurity.setSecure(true);
+  }
+
+  @override
   void dispose() {
+    WindowSecurity.setSecure(false);
     _tokenController.dispose();
+    _secretController.dispose();
     _nameController.dispose();
     super.dispose();
+  }
+
+  bool get _canGoBack =>
+      _step != _Step.pickCategory &&
+      _step != _Step.validating &&
+      _step != _Step.nameIt;
+
+  void _onBack() {
+    setState(() {
+      if (_step == _Step.pickAccount) {
+        _step = _Step.enterToken;
+      } else if (_step == _Step.enterToken) {
+        _step = _Step.pickProvider;
+      } else if (_step == _Step.pickProvider) {
+        _step = _Step.pickCategory;
+      }
+      _errorMessage = null;
+    });
   }
 
   @override
@@ -80,20 +121,11 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: HHSpacing.lg),
                 child: Row(
                   children: [
-                    if (_step != _Step.pickProvider && _step != _Step.nameIt)
+                    if (_canGoBack)
                       Padding(
                         padding: const EdgeInsets.only(right: HHSpacing.sm),
                         child: AppPressable(
-                          onTap: () {
-                            setState(() {
-                              if (_step == _Step.pickAccount) {
-                                _step = _Step.enterToken;
-                              } else {
-                                _step = _Step.pickProvider;
-                              }
-                              _errorMessage = null;
-                            });
-                          },
+                          onTap: _onBack,
                           child: Container(
                             width: 32,
                             height: 32,
@@ -156,8 +188,11 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
   }
 
   String _titleForStep() => switch (_step) {
-        _Step.pickProvider => 'Add Connection',
-        _Step.enterToken => 'Enter API Token',
+        _Step.pickCategory => 'Add Connection',
+        _Step.pickProvider => _category == _Category.hosting
+            ? 'Hosting Platform'
+            : 'Domain Registrar',
+        _Step.enterToken => 'Enter Credentials',
         _Step.validating => 'Verifying…',
         _Step.pickAccount => 'Choose Account',
         _Step.nameIt => 'Connection Details',
@@ -165,18 +200,30 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
 
   Widget _buildStep(HHTokens hh) {
     return switch (_step) {
-      _Step.pickProvider => _ProviderPicker(
-          onPick: _onProviderPicked,
+      _Step.pickCategory => _CategoryPicker(
+          onPick: _onCategoryPicked,
           hh: hh,
         ),
-      _Step.enterToken => _TokenEntry(
-          provider: _provider!,
-          controller: _tokenController,
-          obscured: _tokenObscured,
+      _Step.pickProvider => _ProviderPicker(
+          category: _category,
+          onPickHosting: _onHostingPicked,
+          onPickRegistrar: _onRegistrarPicked,
+          hh: hh,
+        ),
+      _Step.enterToken => _CredentialsEntry(
+          hostingProvider: _hostingProvider,
+          registrarProvider: _registrarProvider,
+          tokenController: _tokenController,
+          secretController: _secretController,
+          tokenObscured: _tokenObscured,
+          secretObscured: _secretObscured,
           errorMessage: _errorMessage,
-          onToggleObscure: () =>
+          onToggleTokenObscure: () =>
               setState(() => _tokenObscured = !_tokenObscured),
-          onPaste: _paste,
+          onToggleSecretObscure: () =>
+              setState(() => _secretObscured = !_secretObscured),
+          onPasteToken: _pasteToken,
+          onPasteSecret: _pasteSecret,
           onSubmit: _validate,
           hh: hh,
         ),
@@ -194,66 +241,145 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
     };
   }
 
-  void _onProviderPicked(ProviderId p) {
+  void _onCategoryPicked(_Category cat) {
     setState(() {
-      _provider = p;
-      _step = _Step.enterToken;
+      _category = cat;
+      _step = _Step.pickProvider;
+      _hostingProvider = null;
+      _registrarProvider = null;
       _errorMessage = null;
     });
   }
 
-  Future<void> _paste() async {
+  void _onHostingPicked(ProviderId p) {
+    setState(() {
+      _hostingProvider = p;
+      _registrarProvider = null;
+      _step = _Step.enterToken;
+      _errorMessage = null;
+      _tokenController.clear();
+      _secretController.clear();
+    });
+  }
+
+  void _onRegistrarPicked(RegistrarId r) {
+    setState(() {
+      _registrarProvider = r;
+      _hostingProvider = null;
+      _step = _Step.enterToken;
+      _errorMessage = null;
+      _tokenController.clear();
+      _secretController.clear();
+    });
+  }
+
+  Future<void> _pasteToken() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text != null) {
       _tokenController.text = data!.text!.trim();
-      _token = _tokenController.text;
+    }
+  }
+
+  Future<void> _pasteSecret() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null) {
+      _secretController.text = data!.text!.trim();
     }
   }
 
   Future<void> _validate() async {
     _token = _tokenController.text.trim();
-    if (_token.isEmpty) {
-      setState(() => _errorMessage = 'Please paste your API token above');
-      return;
-    }
-    setState(() {
-      _step = _Step.validating;
-      _errorMessage = null;
-    });
+    _secretKey = _secretController.text.trim();
 
-    final provider = providerFor(_provider!);
-    final valResult = await provider.validate(
-      _token,
-      selectedAccountId: _selectedAccountId,
-    );
+    if (_category == _Category.hosting) {
+      if (_token.isEmpty) {
+        setState(() => _errorMessage = 'Please paste your API token above');
+        return;
+      }
+      setState(() {
+        _step = _Step.validating;
+        _errorMessage = null;
+      });
 
-    valResult.when(
-      ok: (account) async {
-        if (account.requiresTeamPick && _selectedAccountId == null) {
+      final provider = providerFor(_hostingProvider!);
+      final valResult = await provider.validate(
+        _token,
+        selectedAccountId: _selectedAccountId,
+      );
+
+      valResult.when(
+        ok: (account) async {
+          if (account.requiresTeamPick && _selectedAccountId == null) {
+            setState(() {
+              _accountOptions = account.teamOptions;
+              _step = _Step.pickAccount;
+            });
+            return;
+          }
+
+          await _createAndFinalizeHostingConnection(
+            selectedAccountId: _selectedAccountId ?? account.accountId,
+          );
+        },
+        err: (e) {
           setState(() {
-            _accountOptions = account.teamOptions;
-            _step = _Step.pickAccount;
+            _step = _Step.enterToken;
+            _errorMessage = _friendlyError(e);
           });
+        },
+      );
+    } else {
+      // Registrar
+      if (_registrarProvider == RegistrarId.porkbun) {
+        if (_token.isEmpty || _secretKey.isEmpty) {
+          setState(() =>
+              _errorMessage = 'Please enter both API Key and Secret Key');
           return;
         }
+      } else {
+        if (_token.isEmpty) {
+          setState(() => _errorMessage = 'Please paste your API token above');
+          return;
+        }
+      }
 
-        // Account is chosen or single — save connection
-        await _createAndFinalizeConnection(
-          selectedAccountId: _selectedAccountId ?? account.accountId,
-        );
-      },
-      err: (e) {
-        setState(() {
-          _step = _Step.enterToken;
-          _errorMessage = _friendlyError(e);
-        });
-      },
-    );
+      setState(() {
+        _step = _Step.validating;
+        _errorMessage = null;
+      });
+
+      final Credential cred = _registrarProvider == RegistrarId.porkbun
+          ? KeyPairCredential(apiKey: _token, secretKey: _secretKey)
+          : BearerCredential(token: _token);
+
+      final result = await ref
+          .read(connectionsProvider.notifier)
+          .addRegistrarConnection(
+            registrarId: _registrarProvider!,
+            credential: cred,
+          );
+
+      result.when(
+        ok: (conn) {
+          _createdConnectionId = conn.id;
+          _nameController.text = conn.displayName;
+          setState(() => _step = _Step.nameIt);
+        },
+        err: (e) {
+          setState(() {
+            _step = _Step.enterToken;
+            _errorMessage = _friendlyError(e);
+          });
+        },
+      );
+    }
   }
 
-  Future<void> _createAndFinalizeConnection({String? selectedAccountId}) async {
+  Future<void> _createAndFinalizeHostingConnection({
+    String? selectedAccountId,
+  }) async {
     final result = await ref.read(connectionsProvider.notifier).addConnection(
-          providerId: _provider!,
+          providerId: _hostingProvider!,
           token: _token,
           selectedAccountId: selectedAccountId,
         );
@@ -278,7 +404,7 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
       _selectedAccountId = accountId;
       _step = _Step.validating;
     });
-    _createAndFinalizeConnection(selectedAccountId: accountId);
+    _createAndFinalizeHostingConnection(selectedAccountId: accountId);
   }
 
   Future<void> _save() async {
@@ -289,16 +415,17 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
           .read(connectionsProvider.notifier)
           .updateDisplayName(_createdConnectionId!, customName);
     }
-    // Refresh sites feed immediately
+    // Refresh feeds immediately
     ref.invalidate(sitesProvider);
+    ref.invalidate(domainsProvider);
     if (mounted) Navigator.of(context).pop();
   }
 
   String _friendlyError(ApiException e) => switch (e) {
         UnauthorizedException() =>
-          'Invalid token — check that you copied the complete token.',
+          'Invalid credentials — check that you entered them correctly.',
         ForbiddenException() =>
-          'Token lacks required permissions. Check instructions below.',
+          'Credentials lack required permissions. Check instructions below.',
         NotFoundException() => 'Account not found — verify your token scope.',
         RateLimitedException() => 'Rate limited — wait a moment and try again.',
         NetworkException() => 'Network connection error — check internet.',
@@ -306,9 +433,9 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
       };
 }
 
-class _ProviderPicker extends StatelessWidget {
-  const _ProviderPicker({required this.onPick, required this.hh});
-  final ValueChanged<ProviderId> onPick;
+class _CategoryPicker extends StatelessWidget {
+  const _CategoryPicker({required this.onPick, required this.hh});
+  final ValueChanged<_Category> onPick;
   final HHTokens hh;
 
   @override
@@ -317,15 +444,157 @@ class _ProviderPicker extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Select a hosting platform to link with Hivetics.',
+          'Select the type of service you would like to connect to Hivetics.',
           style: hh.body().copyWith(color: hh.textSecondary),
         ),
         const SizedBox(height: HHSpacing.lg),
-        ...ProviderId.values.map((p) => Padding(
+        _CategoryCard(
+          icon: LucideIcons.server,
+          title: 'Hosting Platform',
+          subtitle: 'Vercel, Netlify, Cloudflare Pages',
+          onTap: () {
+            HHHaptics.selectionClick();
+            onPick(_Category.hosting);
+          },
+          hh: hh,
+        ),
+        const SizedBox(height: HHSpacing.md),
+        _CategoryCard(
+          icon: LucideIcons.globe,
+          title: 'Domain Registrar',
+          subtitle: 'GoDaddy, Porkbun, Cloudflare Registrar',
+          onTap: () {
+            HHHaptics.selectionClick();
+            onPick(_Category.registrar);
+          },
+          hh: hh,
+        ),
+        const SizedBox(height: HHSpacing.xl),
+      ],
+    );
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.hh,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final HHTokens hh;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPressable(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(HHSpacing.lg),
+        decoration: BoxDecoration(
+          color: hh.bgElevated,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: hh.cardBorder.withValues(alpha: 0.8)),
+          boxShadow: hh.cardShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: hh.accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: hh.accent, size: 20),
+            ),
+            const SizedBox(width: HHSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: hh.headline().copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: hh.footnote().copyWith(color: hh.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: HHSpacing.sm),
+            Icon(LucideIcons.chevronRight, color: hh.textTertiary, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProviderPicker extends StatelessWidget {
+  const _ProviderPicker({
+    required this.category,
+    required this.onPickHosting,
+    required this.onPickRegistrar,
+    required this.hh,
+  });
+
+  final _Category category;
+  final ValueChanged<ProviderId> onPickHosting;
+  final ValueChanged<RegistrarId> onPickRegistrar;
+  final HHTokens hh;
+
+  @override
+  Widget build(BuildContext context) {
+    if (category == _Category.hosting) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Select a hosting provider to link your deployments and sites.',
+            style: hh.body().copyWith(color: hh.textSecondary),
+          ),
+          const SizedBox(height: HHSpacing.lg),
+          ...ProviderId.values.map((p) => Padding(
+                padding: const EdgeInsets.only(bottom: HHSpacing.md),
+                child: _HostingCard(
+                  provider: p,
+                  onPick: onPickHosting,
+                  hh: hh,
+                ),
+              )),
+          const SizedBox(height: HHSpacing.xl),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Select a domain registrar to monitor expirations and DNS records.',
+          style: hh.body().copyWith(color: hh.textSecondary),
+        ),
+        const SizedBox(height: HHSpacing.lg),
+        ...RegistrarId.values.map((r) => Padding(
               padding: const EdgeInsets.only(bottom: HHSpacing.md),
-              child: _ProviderCard(
-                provider: p,
-                onPick: onPick,
+              child: _RegistrarCard(
+                registrar: r,
+                onPick: onPickRegistrar,
                 hh: hh,
               ),
             )),
@@ -335,8 +604,8 @@ class _ProviderPicker extends StatelessWidget {
   }
 }
 
-class _ProviderCard extends StatelessWidget {
-  const _ProviderCard({
+class _HostingCard extends StatelessWidget {
+  const _HostingCard({
     required this.provider,
     required this.onPick,
     required this.hh,
@@ -349,7 +618,6 @@ class _ProviderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = switch (provider) {
-      // Kept to a similar length so the three cards read as one set.
       ProviderId.vercel => 'Frontend & serverless deploys',
       ProviderId.netlify => 'Web apps & custom domains',
       ProviderId.cloudflarepages => 'Edge hosting & preview branches',
@@ -378,10 +646,6 @@ class _ProviderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Both lines are pinned to a single line so every card is
-                  // exactly the same height. "Cloudflare Pages" is long enough
-                  // to wrap on narrow screens, which made that one card taller
-                  // than the other two.
                   Text(
                     provider.displayName,
                     style: hh.headline().copyWith(fontWeight: FontWeight.w700),
@@ -407,26 +671,123 @@ class _ProviderCard extends StatelessWidget {
   }
 }
 
-class _TokenEntry extends StatelessWidget {
-  const _TokenEntry({
-    required this.provider,
-    required this.controller,
-    required this.obscured,
+class _RegistrarCard extends StatelessWidget {
+  const _RegistrarCard({
+    required this.registrar,
+    required this.onPick,
+    required this.hh,
+  });
+
+  final RegistrarId registrar;
+  final ValueChanged<RegistrarId> onPick;
+  final HHTokens hh;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = switch (registrar) {
+      RegistrarId.godaddy => 'Domains & DNS management',
+      RegistrarId.porkbun => 'Domains & DNS management',
+      RegistrarId.cloudflareregistrar => 'Domains & DNS zones',
+    };
+
+    return AppPressable(
+      onTap: () {
+        HHHaptics.selectionClick();
+        onPick(registrar);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(HHSpacing.lg),
+        decoration: BoxDecoration(
+          color: hh.bgElevated,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: hh.cardBorder.withValues(alpha: 0.8)),
+          boxShadow: hh.cardShadow,
+        ),
+        child: Row(
+          children: [
+            RegistrarBadge(registrarId: registrar, showLabel: false, size: 36),
+            const SizedBox(width: HHSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    registrar.displayName,
+                    style: hh.headline().copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: hh.footnote().copyWith(color: hh.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: HHSpacing.sm),
+            Icon(LucideIcons.chevronRight, color: hh.textTertiary, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CredentialsEntry extends StatelessWidget {
+  const _CredentialsEntry({
+    required this.hostingProvider,
+    required this.registrarProvider,
+    required this.tokenController,
+    required this.secretController,
+    required this.tokenObscured,
+    required this.secretObscured,
     required this.errorMessage,
-    required this.onToggleObscure,
-    required this.onPaste,
+    required this.onToggleTokenObscure,
+    required this.onToggleSecretObscure,
+    required this.onPasteToken,
+    required this.onPasteSecret,
     required this.onSubmit,
     required this.hh,
   });
 
-  final ProviderId provider;
-  final TextEditingController controller;
-  final bool obscured;
+  final ProviderId? hostingProvider;
+  final RegistrarId? registrarProvider;
+  final TextEditingController tokenController;
+  final TextEditingController secretController;
+  final bool tokenObscured;
+  final bool secretObscured;
   final String? errorMessage;
-  final VoidCallback onToggleObscure;
-  final VoidCallback onPaste;
+  final VoidCallback onToggleTokenObscure;
+  final VoidCallback onToggleSecretObscure;
+  final VoidCallback onPasteToken;
+  final VoidCallback onPasteSecret;
   final VoidCallback onSubmit;
   final HHTokens hh;
+
+  bool get isPorkbun => registrarProvider == RegistrarId.porkbun;
+
+  String get displayName => hostingProvider != null
+      ? hostingProvider!.displayName
+      : registrarProvider!.displayName;
+
+  String get portalUrl => switch (hostingProvider) {
+        ProviderId.vercel => 'https://vercel.com/account/tokens',
+        ProviderId.netlify =>
+          'https://app.netlify.com/user/applications#personal-access-tokens',
+        ProviderId.cloudflarepages =>
+          'https://dash.cloudflare.com/profile/api-tokens',
+        null => switch (registrarProvider!) {
+            RegistrarId.godaddy => 'https://developer.godaddy.com/keys',
+            RegistrarId.porkbun => 'https://porkbun.com/account/api',
+            RegistrarId.cloudflareregistrar =>
+              'https://dash.cloudflare.com/profile/api-tokens',
+          },
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -435,28 +796,47 @@ class _TokenEntry extends StatelessWidget {
       children: [
         Row(
           children: [
-            ProviderBadge(providerId: provider, showLabel: false, size: 24),
+            if (hostingProvider != null)
+              ProviderBadge(
+                providerId: hostingProvider!,
+                showLabel: false,
+                size: 24,
+              )
+            else
+              RegistrarBadge(
+                registrarId: registrarProvider!,
+                showLabel: false,
+                size: 24,
+              ),
             const SizedBox(width: HHSpacing.sm),
-            Text(
-              '${provider.displayName} API Token',
-              style: hh.headline().copyWith(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                '$displayName Credentials',
+                style: hh.headline().copyWith(fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
         const SizedBox(height: HHSpacing.sm),
         Text(
-          'Hivetics encrypts and stores your token locally using the Android Keystore. It never leaves your device.',
+          'Hivetics encrypts and stores credentials locally using Android Keystore. They never leave your device.',
           style: hh.footnote().copyWith(color: hh.textSecondary),
         ),
         const SizedBox(height: HHSpacing.lg),
 
-        // Token input
+        // Primary Field (Token or API Key)
+        if (isPorkbun) ...[
+          Text('API KEY', style: hh.caption2()),
+          const SizedBox(height: HHSpacing.xs),
+        ],
         TextField(
-          controller: controller,
-          obscureText: obscured,
+          controller: tokenController,
+          obscureText: tokenObscured,
           style: hh.mono(),
           decoration: InputDecoration(
-            hintText: 'Paste your ${provider.displayName} token',
+            hintText: isPorkbun ? 'Enter API Key (pk1_...)' : 'Paste your $displayName token',
             contentPadding: const EdgeInsets.symmetric(
               horizontal: HHSpacing.md,
               vertical: HHSpacing.md,
@@ -466,20 +846,56 @@ class _TokenEntry extends StatelessWidget {
               children: [
                 IconButton(
                   icon: Icon(
-                    obscured ? LucideIcons.eye : LucideIcons.eyeOff,
+                    tokenObscured ? LucideIcons.eye : LucideIcons.eyeOff,
                     size: 18,
                     color: hh.textTertiary,
                   ),
-                  onPressed: onToggleObscure,
+                  onPressed: onToggleTokenObscure,
                 ),
                 IconButton(
                   icon: Icon(LucideIcons.clipboard, size: 18, color: hh.accent),
-                  onPressed: onPaste,
+                  onPressed: onPasteToken,
                 ),
               ],
             ),
           ),
         ),
+
+        // Second Field (Secret Key for Porkbun)
+        if (isPorkbun) ...[
+          const SizedBox(height: HHSpacing.md),
+          Text('SECRET API KEY', style: hh.caption2()),
+          const SizedBox(height: HHSpacing.xs),
+          TextField(
+            controller: secretController,
+            obscureText: secretObscured,
+            style: hh.mono(),
+            decoration: InputDecoration(
+              hintText: 'Enter Secret API Key (sk1_...)',
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: HHSpacing.md,
+                vertical: HHSpacing.md,
+              ),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      secretObscured ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 18,
+                      color: hh.textTertiary,
+                    ),
+                    onPressed: onToggleSecretObscure,
+                  ),
+                  IconButton(
+                    icon: Icon(LucideIcons.clipboard, size: 18, color: hh.accent),
+                    onPressed: onPasteSecret,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
 
         if (errorMessage != null) ...[
           const SizedBox(height: HHSpacing.md),
@@ -535,22 +951,47 @@ class _TokenEntry extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    LucideIcons.helpCircle,
-                    size: 14,
-                    color: hh.textSecondary,
+                  Row(
+                    children: [
+                      Icon(
+                        LucideIcons.helpCircle,
+                        size: 14,
+                        color: hh.textSecondary,
+                      ),
+                      const SizedBox(width: HHSpacing.xs),
+                      Text(
+                        'How to get credentials',
+                        style: hh.caption().copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: HHSpacing.xs),
-                  Text(
-                    'How to generate a token',
-                    style: hh.caption().copyWith(fontWeight: FontWeight.w600),
+                  AppPressable(
+                    onTap: () => launchUrl(
+                      Uri.parse(portalUrl),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Open $displayName',
+                          style: hh.caption().copyWith(
+                                color: hh.accent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(LucideIcons.externalLink, size: 12, color: hh.accent),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: HHSpacing.xs),
+              const SizedBox(height: HHSpacing.sm),
               Text(
-                _mintingInstructions(provider),
+                _mintingInstructions(),
                 style: hh.footnote().copyWith(height: 1.45),
               ),
             ],
@@ -565,14 +1006,27 @@ class _TokenEntry extends StatelessWidget {
     );
   }
 
-  static String _mintingInstructions(ProviderId id) => switch (id) {
+  String _mintingInstructions() {
+    if (hostingProvider != null) {
+      return switch (hostingProvider!) {
         ProviderId.vercel =>
           '1. Go to vercel.com → Avatar → Settings → Tokens\n2. Click "Create Token"\n3. Scope: select your Team if your projects are under a team\n4. Copy and paste the full token here',
         ProviderId.netlify =>
           '1. Go to app.netlify.com → Avatar → User settings\n2. Navigate to Applications → Personal access tokens\n3. Click "New access token" and set an expiration\n4. Copy the generated token',
         ProviderId.cloudflarepages =>
-          '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Click "Create Token" → Custom token\n3. Add 4 permissions: Account·Account Settings·Read, Account·Cloudflare Pages·Read, Account·Registrar Domains·Read, Zone·DNS·Read (All zones)\n4. Copy the token\n\nThis one token also powers the Domains tab if you use Cloudflare Registrar — no second connection needed.',
+          '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Click "Create Token" → Custom token\n3. Add 4 permissions: Account·Account Settings·Read, Account·Cloudflare Pages·Read, Account·Registrar Domains·Read, Zone·DNS·Read (All zones)\n4. Copy the token\n\nThis one token also powers the Domains tab if you use Cloudflare Registrar.',
       };
+    }
+
+    return switch (registrarProvider!) {
+      RegistrarId.godaddy =>
+        '1. Go to developer.godaddy.com/keys\n2. Click "Create New API Key" (choose "Production") or generate a Personal Access Token (PAT)\n3. Copy the token and paste it above.\n\nNote: Requires at least 1 active domain in your GoDaddy account.',
+      RegistrarId.porkbun =>
+        '1. Go to porkbun.com/account/api\n2. Generate an API Key and API Secret\n3. In your Porkbun Domain Management list, ensure "API Access" is enabled for the domains you want visible here\n4. Paste both keys above',
+      RegistrarId.cloudflareregistrar =>
+        '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Create a Custom Token with:\n   • Account · Registrar Domains · Read\n   • Account · Account Settings · Read\n   • Zone · DNS · Read\n3. Copy and paste the token above',
+    };
+  }
 }
 
 class _ValidatingState extends StatelessWidget {
@@ -588,7 +1042,7 @@ class _ValidatingState extends StatelessWidget {
           const SizedBox(height: HHSpacing.xxxl),
           const CupertinoActivityIndicator(radius: 16),
           const SizedBox(height: HHSpacing.lg),
-          Text('Verifying token…', style: hh.body()),
+          Text('Verifying credentials…', style: hh.body()),
           const SizedBox(height: HHSpacing.xxxl),
         ],
       ),
@@ -745,7 +1199,7 @@ class _NameStep extends StatelessWidget {
           controller: controller,
           style: hh.body(),
           decoration: const InputDecoration(
-            hintText: 'e.g. My Vercel Production',
+            hintText: 'e.g. My Production Domains',
             contentPadding: EdgeInsets.symmetric(
               horizontal: HHSpacing.md,
               vertical: HHSpacing.md,

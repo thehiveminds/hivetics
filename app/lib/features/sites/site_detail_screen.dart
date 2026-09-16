@@ -23,6 +23,7 @@ import '../../widgets/copyable_value.dart';
 import '../deploys/deployment_detail_screen.dart';
 import '../dns/dns_records_screen.dart';
 import 'site_deployments_screen.dart';
+import 'widgets/site_analytics_section.dart';
 
 class SiteDetailScreen extends ConsumerWidget {
   const SiteDetailScreen({super.key, required this.site});
@@ -106,6 +107,15 @@ class SiteDetailScreen extends ConsumerWidget {
                   ),
 
                 const SizedBox(height: HHSpacing.xl),
+
+                if (project != null) ...[
+                  SiteAnalyticsSection(
+                    connectionId: project.connectionId,
+                    projectId: project.id,
+                    site: site,
+                  ),
+                  const SizedBox(height: HHSpacing.xl),
+                ],
 
                 if (site.registration != null) ...[
                   _domainSection(

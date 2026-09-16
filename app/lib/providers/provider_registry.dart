@@ -15,6 +15,10 @@ import 'registrar/namecom_provider.dart';
 import 'registrar/gandi_provider.dart';
 import 'registrar/namesilo_provider.dart';
 import 'registrar/dynadot_provider.dart';
+import '../models/service_ref.dart';
+import 'analytics/analytics_provider.dart';
+import 'analytics/gsc_provider.dart';
+import 'analytics/generic_analytics_provider.dart';
 
 final _hostingRegistry = <ProviderId, HostingProvider>{
   ProviderId.vercel: VercelProvider(),
@@ -48,4 +52,21 @@ RegistrarProvider registrarProviderFor(RegistrarId id) {
 }
 
 List<RegistrarProvider> get allRegistrarProviders => _registrarRegistry.values.toList();
+
+final _analyticsRegistry = <AnalyticsProviderId, AnalyticsProvider>{
+  AnalyticsProviderId.gsc: GscProvider(),
+  AnalyticsProviderId.ga4: const GenericAnalyticsProvider(AnalyticsProviderId.ga4),
+  AnalyticsProviderId.clarity: const GenericAnalyticsProvider(AnalyticsProviderId.clarity),
+  AnalyticsProviderId.plausible: const GenericAnalyticsProvider(AnalyticsProviderId.plausible),
+  AnalyticsProviderId.umami: const GenericAnalyticsProvider(AnalyticsProviderId.umami),
+};
+
+AnalyticsProvider analyticsProviderFor(AnalyticsProviderId id) {
+  final p = _analyticsRegistry[id];
+  assert(p != null, 'No analytics provider registered for $id — add it to provider_registry.dart');
+  return p!;
+}
+
+List<AnalyticsProvider> get allAnalyticsProviders => _analyticsRegistry.values.toList();
+
 

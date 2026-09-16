@@ -8,6 +8,7 @@ import '../../core/network/api_exception.dart';
 import '../../models/connection.dart';
 import '../../models/credential.dart';
 import '../../models/registrar_id.dart';
+import '../../models/service_ref.dart';
 import '../../providers/hosting/hosting_provider.dart';
 import '../../providers/provider_registry.dart';
 import '../../shared/haptics.dart';
@@ -28,13 +29,14 @@ class AddConnectionSheet extends ConsumerStatefulWidget {
 }
 
 enum _Step { pickCategory, pickProvider, enterToken, validating, pickAccount, nameIt }
-enum _Category { hosting, registrar }
+enum _Category { hosting, registrar, analytics }
 
 class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
   _Step _step = _Step.pickCategory;
   _Category _category = _Category.hosting;
   ProviderId? _hostingProvider;
   RegistrarId? _registrarProvider;
+  AnalyticsProviderId? _analyticsProvider;
 
   String _token = '';
   String _secretKey = '';
@@ -188,9 +190,11 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
 
   String _titleForStep() => switch (_step) {
         _Step.pickCategory => 'Add Connection',
-        _Step.pickProvider => _category == _Category.hosting
-            ? 'Hosting Platform'
-            : 'Domain Registrar',
+        _Step.pickProvider => switch (_category) {
+            _Category.hosting => 'Hosting Platform',
+            _Category.registrar => 'Domain Registrar',
+            _Category.analytics => 'Analytics & Search',
+          },
         _Step.enterToken => 'Enter Credentials',
         _Step.validating => 'Verifying…',
         _Step.pickAccount => 'Choose Account',
@@ -207,11 +211,13 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
           category: _category,
           onPickHosting: _onHostingPicked,
           onPickRegistrar: _onRegistrarPicked,
+          onPickAnalytics: _onAnalyticsPicked,
           hh: hh,
         ),
       _Step.enterToken => _CredentialsEntry(
           hostingProvider: _hostingProvider,
           registrarProvider: _registrarProvider,
+          analyticsProvider: _analyticsProvider,
           tokenController: _tokenController,
           secretController: _secretController,
           tokenObscured: _tokenObscured,
@@ -246,6 +252,7 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
       _step = _Step.pickProvider;
       _hostingProvider = null;
       _registrarProvider = null;
+      _analyticsProvider = null;
       _errorMessage = null;
     });
   }
@@ -254,6 +261,7 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
     setState(() {
       _hostingProvider = p;
       _registrarProvider = null;
+      _analyticsProvider = null;
       _step = _Step.enterToken;
       _errorMessage = null;
       _tokenController.clear();
@@ -265,6 +273,19 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
     setState(() {
       _registrarProvider = r;
       _hostingProvider = null;
+      _analyticsProvider = null;
+      _step = _Step.enterToken;
+      _errorMessage = null;
+      _tokenController.clear();
+      _secretController.clear();
+    });
+  }
+
+  void _onAnalyticsPicked(AnalyticsProviderId a) {
+    setState(() {
+      _analyticsProvider = a;
+      _hostingProvider = null;
+      _registrarProvider = null;
       _step = _Step.enterToken;
       _errorMessage = null;
       _tokenController.clear();
@@ -319,6 +340,37 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
           await _createAndFinalizeHostingConnection(
             selectedAccountId: _selectedAccountId ?? account.accountId,
           );
+        },
+        err: (e) {
+          setState(() {
+            _step = _Step.enterToken;
+            _errorMessage = _friendlyError(e);
+          });
+        },
+      );
+    } else if (_category == _Category.analytics) {
+      if (_token.isEmpty) {
+        setState(() => _errorMessage = 'Please paste your API token or key above');
+        return;
+      }
+      setState(() {
+        _step = _Step.validating;
+        _errorMessage = null;
+      });
+
+      final cred = BearerCredential(token: _token.trim());
+      final result = await ref
+          .read(connectionsProvider.notifier)
+          .addAnalyticsConnection(
+            providerId: _analyticsProvider!,
+            credential: cred,
+          );
+
+      result.when(
+        ok: (conn) {
+          _createdConnectionId = conn.id;
+          _nameController.text = conn.displayName;
+          setState(() => _step = _Step.nameIt);
         },
         err: (e) {
           setState(() {
@@ -488,6 +540,17 @@ class _CategoryPicker extends StatelessWidget {
           },
           hh: hh,
         ),
+        const SizedBox(height: HHSpacing.md),
+        _CategoryCard(
+          icon: LucideIcons.lineChart,
+          title: 'Analytics & Search',
+          subtitle: 'Google Search Console, GA4, Clarity',
+          onTap: () {
+            HHHaptics.selectionClick();
+            onPick(_Category.analytics);
+          },
+          hh: hh,
+        ),
         const SizedBox(height: HHSpacing.xl),
       ],
     );
@@ -569,12 +632,14 @@ class _ProviderPicker extends StatelessWidget {
     required this.category,
     required this.onPickHosting,
     required this.onPickRegistrar,
+    required this.onPickAnalytics,
     required this.hh,
   });
 
   final _Category category;
   final ValueChanged<ProviderId> onPickHosting;
   final ValueChanged<RegistrarId> onPickRegistrar;
+  final ValueChanged<AnalyticsProviderId> onPickAnalytics;
   final HHTokens hh;
 
   @override
@@ -601,6 +666,28 @@ class _ProviderPicker extends StatelessWidget {
       );
     }
 
+    if (category == _Category.analytics) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Select an analytics service or search console to monitor traffic and visibility.',
+            style: hh.body().copyWith(color: hh.textSecondary),
+          ),
+          const SizedBox(height: HHSpacing.lg),
+          ...AnalyticsProviderId.values.map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: HHSpacing.md),
+                child: _AnalyticsCard(
+                  provider: a,
+                  onPick: onPickAnalytics,
+                  hh: hh,
+                ),
+              )),
+          const SizedBox(height: HHSpacing.xl),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -619,6 +706,75 @@ class _ProviderPicker extends StatelessWidget {
             )),
         const SizedBox(height: HHSpacing.xl),
       ],
+    );
+  }
+}
+
+class _AnalyticsCard extends StatelessWidget {
+  const _AnalyticsCard({
+    required this.provider,
+    required this.onPick,
+    required this.hh,
+  });
+
+  final AnalyticsProviderId provider;
+  final ValueChanged<AnalyticsProviderId> onPick;
+  final HHTokens hh;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = switch (provider) {
+      AnalyticsProviderId.gsc => 'Search traffic, CTR, ranking & indexing',
+      AnalyticsProviderId.ga4 => 'Web & app user analytics',
+      AnalyticsProviderId.clarity => 'Heatmaps & session recordings',
+      AnalyticsProviderId.plausible => 'Privacy-friendly lightweight web analytics',
+      AnalyticsProviderId.umami => 'Privacy-first analytics & event tracking',
+    };
+
+    return AppPressable(
+      onTap: () {
+        HHHaptics.selectionClick();
+        onPick(provider);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(HHSpacing.lg),
+        decoration: BoxDecoration(
+          color: hh.bgElevated,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: hh.cardBorder.withValues(alpha: 0.8)),
+          boxShadow: hh.cardShadow,
+        ),
+        child: Row(
+          children: [
+            AnalyticsBadge(providerId: provider, showLabel: false, size: 36),
+            const SizedBox(width: HHSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    provider.displayName,
+                    style: hh.headline().copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: hh.footnote().copyWith(color: hh.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: HHSpacing.sm),
+            Icon(LucideIcons.chevronRight, color: hh.textTertiary, size: 18),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -766,6 +922,7 @@ class _CredentialsEntry extends StatelessWidget {
   const _CredentialsEntry({
     required this.hostingProvider,
     required this.registrarProvider,
+    this.analyticsProvider,
     required this.tokenController,
     required this.secretController,
     required this.tokenObscured,
@@ -781,6 +938,7 @@ class _CredentialsEntry extends StatelessWidget {
 
   final ProviderId? hostingProvider;
   final RegistrarId? registrarProvider;
+  final AnalyticsProviderId? analyticsProvider;
   final TextEditingController tokenController;
   final TextEditingController secretController;
   final bool tokenObscured;
@@ -800,7 +958,9 @@ class _CredentialsEntry extends StatelessWidget {
 
   String get displayName => hostingProvider != null
       ? hostingProvider!.displayName
-      : registrarProvider!.displayName;
+      : (registrarProvider != null
+          ? registrarProvider!.displayName
+          : (analyticsProvider?.displayName ?? 'Service'));
 
   String get portalUrl => switch (hostingProvider) {
         ProviderId.vercel => 'https://vercel.com/account/tokens',
@@ -808,7 +968,7 @@ class _CredentialsEntry extends StatelessWidget {
           'https://app.netlify.com/user/applications#personal-access-tokens',
         ProviderId.cloudflarepages =>
           'https://dash.cloudflare.com/profile/api-tokens',
-        null => switch (registrarProvider!) {
+        null => switch (registrarProvider) {
             RegistrarId.godaddy => 'https://developer.godaddy.com/keys',
             RegistrarId.porkbun => 'https://porkbun.com/account/api',
             RegistrarId.cloudflareregistrar =>
@@ -823,6 +983,14 @@ class _CredentialsEntry extends StatelessWidget {
               'https://admin.gandi.net/user/security',
             RegistrarId.dynadot =>
               'https://www.dynadot.com/account/domain/api.html',
+            null => switch (analyticsProvider!) {
+                AnalyticsProviderId.gsc =>
+                  'https://search.google.com/search-console',
+                AnalyticsProviderId.ga4 => 'https://analytics.google.com',
+                AnalyticsProviderId.clarity => 'https://clarity.microsoft.com',
+                AnalyticsProviderId.plausible => 'https://plausible.io',
+                AnalyticsProviderId.umami => 'https://cloud.umami.is',
+              },
           },
       };
 
@@ -866,9 +1034,15 @@ class _CredentialsEntry extends StatelessWidget {
                 showLabel: false,
                 size: 24,
               )
-            else
+            else if (registrarProvider != null)
               RegistrarBadge(
                 registrarId: registrarProvider!,
+                showLabel: false,
+                size: 24,
+              )
+            else if (analyticsProvider != null)
+              AnalyticsBadge(
+                providerId: analyticsProvider!,
                 showLabel: false,
                 size: 24,
               ),
@@ -1093,6 +1267,21 @@ class _CredentialsEntry extends StatelessWidget {
           '1. Go to app.netlify.com → Avatar → User settings\n2. Navigate to Applications → Personal access tokens\n3. Click "New access token" and set an expiration\n4. Copy the generated token',
         ProviderId.cloudflarepages =>
           '1. Go to dash.cloudflare.com → My Profile → API Tokens\n2. Click "Create Token" → Custom token\n3. Add 4 permissions: Account·Account Settings·Read, Account·Cloudflare Pages·Read, Account·Registrar Domains·Read, Zone·DNS·Read (All zones)\n4. Copy the token\n\nThis one token also powers the Domains tab if you use Cloudflare Registrar.',
+      };
+    }
+
+    if (analyticsProvider != null) {
+      return switch (analyticsProvider!) {
+        AnalyticsProviderId.gsc =>
+          '1. Go to Google Cloud Console → APIs & Services → Credentials\n2. Create an OAuth 2.0 Client or API Key with Google Search Console API enabled\n3. Or paste an OAuth access token with scope: searchconsole.readonly\n\nFor offline demo mode, enter any demo key.',
+        AnalyticsProviderId.ga4 =>
+          '1. Go to Google Cloud Console → Google Analytics Data API\n2. Create credentials with analytics.readonly scope\n3. Paste the access token or API key',
+        AnalyticsProviderId.clarity =>
+          '1. Go to clarity.microsoft.com → Settings → API Tokens\n2. Create a Project API token\n3. Paste the token here',
+        AnalyticsProviderId.plausible =>
+          '1. Go to plausible.io/settings → API Keys\n2. Click "New Key" with stats read access\n3. Paste the API key here',
+        AnalyticsProviderId.umami =>
+          '1. Go to Umami Settings → Profile / API Keys\n2. Create a new API key with websites read access\n3. Paste the token here',
       };
     }
 

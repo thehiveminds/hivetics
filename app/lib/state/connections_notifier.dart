@@ -99,6 +99,39 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
     );
   }
 
+  /// Validate analytics credentials, then persist to drift + secure storage.
+  Future<Result<Connection>> addAnalyticsConnection({
+    required AnalyticsProviderId providerId,
+    required Credential credential,
+    String? selectedAccountId,
+  }) async {
+    final provider = analyticsProviderFor(providerId);
+    final validationResult = await provider.validate(credential);
+
+    return validationResult.when(
+      ok: (account) async {
+        final id = _uuid.v4();
+        final connection = Connection(
+          id: id,
+          service: AnalyticsRef(providerId),
+          displayName: account.displayName,
+          accountId: account.accountId,
+          accountName: account.displayName,
+        );
+
+        final db = ref.read(dbProvider);
+        await db.upsertConnection(_connectionToCompanion(connection));
+        await SecureStore.instance.saveCredential(id, credential);
+
+        final updated = await _loadFromDb();
+        state = AsyncData(updated);
+
+        return Ok(connection);
+      },
+      err: (e) => Err(e),
+    );
+  }
+
   /// Purges token from SecureStore and all rows from drift in one transaction.
   Future<void> deleteConnection(String connectionId) async {
     final db = ref.read(dbProvider);
@@ -134,9 +167,11 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
   }
 
   static Connection _rowToConnection(ConnectionsMetaData row) {
-    final ServiceRef service = row.kind == 'registrar'
-        ? RegistrarRef(RegistrarId.fromId(row.providerId))
-        : HostRef(ProviderId.fromId(row.providerId));
+    final ServiceRef service = switch (row.kind) {
+      'registrar' => RegistrarRef(RegistrarId.fromId(row.providerId)),
+      'analytics' => AnalyticsRef(AnalyticsProviderId.fromId(row.providerId)),
+      _ => HostRef(ProviderId.fromId(row.providerId)),
+    };
     return Connection(
       id: row.id,
       service: service,
@@ -155,7 +190,11 @@ class ConnectionsNotifier extends AsyncNotifier<List<Connection>> {
         accountId: Value(c.accountId),
         fetchedAt: Value(c.lastSyncedAt),
         lastError: Value(c.lastError),
-        kind: Value(c.service is RegistrarRef ? 'registrar' : 'hosting'),
+        kind: Value(
+          c.service is RegistrarRef
+              ? 'registrar'
+              : (c.service is AnalyticsRef ? 'analytics' : 'hosting'),
+        ),
       );
 }
 

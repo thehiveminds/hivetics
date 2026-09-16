@@ -50,6 +50,9 @@ class Site {
     Project? hostProject,
     RegisteredDomain? registration,
     bool clearRegistration = false,
+    String? gscSiteUrl,
+    String? ga4PropertyId,
+    String? clarityProjectId,
   }) =>
       Site(
         id: id,
@@ -61,8 +64,8 @@ class Site {
         registration: clearRegistration
             ? null
             : (registration ?? this.registration),
-        gscSiteUrl: gscSiteUrl,
-        ga4PropertyId: ga4PropertyId,
-        clarityProjectId: clarityProjectId,
+        gscSiteUrl: gscSiteUrl ?? this.gscSiteUrl,
+        ga4PropertyId: ga4PropertyId ?? this.ga4PropertyId,
+        clarityProjectId: clarityProjectId ?? this.clarityProjectId,
       );
 }

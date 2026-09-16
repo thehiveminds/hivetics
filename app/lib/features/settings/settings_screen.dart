@@ -46,6 +46,9 @@ class SettingsScreen extends ConsumerWidget {
                   final registrars = connections
                       .where((c) => c.service is RegistrarRef)
                       .toList();
+                  final analyticsList = connections
+                      .where((c) => c.service is AnalyticsRef)
+                      .toList();
 
                   return Column(
                     children: [
@@ -76,6 +79,21 @@ class SettingsScreen extends ConsumerWidget {
                         AppGroupedSection(
                           header: 'Registrars',
                           children: registrars
+                              .map(
+                                (c) => _ConnectionRow(
+                                  connection: c,
+                                  hh: hh,
+                                  ref: ref,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                      if (analyticsList.isNotEmpty) ...[
+                        const SizedBox(height: HHSpacing.xl),
+                        AppGroupedSection(
+                          header: 'Analytics & Search',
+                          children: analyticsList
                               .map(
                                 (c) => _ConnectionRow(
                                   connection: c,
@@ -205,6 +223,8 @@ class _ConnectionRow extends StatelessWidget {
         HostRef(:final provider) => ProviderBadge(providerId: provider),
         RegistrarRef(:final registrar) =>
           RegistrarBadge(registrarId: registrar),
+        AnalyticsRef(:final analytics) =>
+          AnalyticsBadge(providerId: analytics),
       },
       trailingWidget: connection.hasError
           ? AppStatusPill(

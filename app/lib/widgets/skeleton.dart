@@ -64,6 +64,28 @@ class _SkeletonState extends State<Skeleton>
       );
 }
 
+class AppSkeleton extends StatelessWidget {
+  const AppSkeleton({
+    super.key,
+    this.width = double.infinity,
+    required this.height,
+    this.borderRadius,
+  });
+
+  final double width;
+  final double height;
+  final BorderRadius? borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Skeleton(
+      width: width,
+      height: height,
+      borderRadius: borderRadius ?? BorderRadius.circular(10),
+    );
+  }
+}
+
 class SiteCardSkeleton extends StatelessWidget {
   const SiteCardSkeleton({super.key});
 

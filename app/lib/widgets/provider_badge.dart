@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/connection.dart';
 import '../models/registrar_id.dart';
+import '../models/service_ref.dart';
 import '../shared/theme.dart';
 
 class ProviderBadge extends StatelessWidget {
@@ -184,6 +185,93 @@ class RegistrarBadge extends StatelessWidget {
             svgPath: 'assets/icons/dynadot.svg',
             fallbackIcon: LucideIcons.compass,
             bg: Color(0xFF28B78D),
+            fg: Color(0xFFFFFFFF),
+          ),
+      };
+}
+
+class AnalyticsBadge extends StatelessWidget {
+  const AnalyticsBadge({
+    super.key,
+    required this.providerId,
+    this.size = 18,
+    this.showLabel = false,
+  });
+
+  final AnalyticsProviderId providerId;
+  final double size;
+  final bool showLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final hh = context.hh;
+    final config = _config(providerId, hh);
+
+    final badge = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: config.bg,
+        borderRadius: BorderRadius.circular(HHRadius.providerBadge),
+      ),
+      alignment: Alignment.center,
+      child: SvgPicture.asset(
+        config.svgPath,
+        width: size * 0.65,
+        height: size * 0.65,
+        colorFilter: ColorFilter.mode(config.fg, BlendMode.srcIn),
+        placeholderBuilder: (_) => Icon(
+          config.fallbackIcon,
+          size: size * 0.65,
+          color: config.fg,
+        ),
+      ),
+    );
+
+    if (!showLabel) return badge;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        badge,
+        const SizedBox(width: HHSpacing.xs),
+        Text(
+          providerId.displayName,
+          style: HHTextStyles.caption(hh.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  static _BadgeConfig _config(AnalyticsProviderId id, HHTokens hh) => switch (id) {
+        AnalyticsProviderId.gsc => const _BadgeConfig(
+            svgPath: 'assets/icons/gsc.svg',
+            fallbackIcon: LucideIcons.search,
+            bg: Color(0xFF4285F4),
+            fg: Color(0xFFFFFFFF),
+          ),
+        AnalyticsProviderId.ga4 => const _BadgeConfig(
+            svgPath: 'assets/icons/ga4.svg',
+            fallbackIcon: LucideIcons.barChart2,
+            bg: Color(0xFFF9AB00),
+            fg: Color(0xFF000000),
+          ),
+        AnalyticsProviderId.clarity => const _BadgeConfig(
+            svgPath: 'assets/icons/clarity.svg',
+            fallbackIcon: LucideIcons.eye,
+            bg: Color(0xFF0078D4),
+            fg: Color(0xFFFFFFFF),
+          ),
+        AnalyticsProviderId.plausible => const _BadgeConfig(
+            svgPath: 'assets/icons/plausible.svg',
+            fallbackIcon: LucideIcons.activity,
+            bg: Color(0xFF5850EC),
+            fg: Color(0xFFFFFFFF),
+          ),
+        AnalyticsProviderId.umami => const _BadgeConfig(
+            svgPath: 'assets/icons/umami.svg',
+            fallbackIcon: LucideIcons.lineChart,
+            bg: Color(0xFF10B981),
             fg: Color(0xFFFFFFFF),
           ),
       };

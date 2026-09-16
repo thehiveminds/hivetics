@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:hivehub/models/service_ref.dart';
 import 'package:hivehub/models/site.dart';
 import 'package:hivehub/providers/hosting/vercel_provider.dart';
 import 'package:hivehub/shared/theme.dart';
+import 'package:hivehub/state/project_analytics_notifier.dart';
 import 'package:hivehub/widgets/charts/cache_hit_bar.dart';
 import 'package:hivehub/widgets/charts/ios_trend_chart.dart';
 
@@ -200,6 +202,78 @@ void main() {
       expect(find.text('7d'), findsNothing);
       expect(find.text('28d'), findsNothing);
       expect(find.text('90d'), findsNothing);
+    });
+
+    testWidgets('SiteAnalyticsSection renders title above full-width days segmented control', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      const vercelSite = Site(
+        id: 'site_vercel_1',
+        displayName: 'My Vercel Site',
+        domain: 'example-vercel.com',
+        hostProject: Project(
+          id: 'prj_vercel_1',
+          connectionId: 'conn_vercel_1',
+          name: 'vercel-site',
+          providerId: ProviderId.vercel,
+        ),
+      );
+
+      final testAnalytics = ProjectAnalytics(
+        projectId: 'prj_vercel_1',
+        timeframe: AnalyticsTimeframe.month,
+        totalPageViews: 1000,
+        totalVisitors: 500,
+        totalRequests: 2000,
+        totalBandwidthBytes: 1024,
+        cache: const CacheBreakdown(hits: 90, misses: 10, bypasses: 0),
+        pageViewsTimeseries: [],
+        visitorsTimeseries: [],
+        requestsTimeseries: [],
+        cacheHitRateTimeseries: [],
+        fetchedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            projectAnalyticsProvider((
+              connectionId: 'conn_vercel_1',
+              projectId: 'prj_vercel_1',
+              timeframe: AnalyticsTimeframe.month,
+            )).overrideWith((ref) => testAnalytics),
+          ],
+          child: MaterialApp(
+            theme: HHTheme.dark().withHHExtension(),
+            home: const Scaffold(
+              body: SiteAnalyticsSection(
+                connectionId: 'conn_vercel_1',
+                projectId: 'prj_vercel_1',
+                site: vercelSite,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final titleFinder = find.text('TRAFFIC & ANALYTICS');
+      final segmentedFinder = find.byType(CupertinoSlidingSegmentedControl<AnalyticsTimeframe>);
+
+      expect(titleFinder, findsOneWidget);
+      expect(segmentedFinder, findsOneWidget);
+
+      // Verify Title is strictly ABOVE the segmented control (stacked layout, not same row)
+      final titleBottom = tester.getBottomLeft(titleFinder).dy;
+      final segmentedTop = tester.getTopLeft(segmentedFinder).dy;
+      expect(segmentedTop, greaterThan(titleBottom));
+
+      // Verify Segmented Control occupies the full content width (400 - 32 screenPadding = 368)
+      final segmentedWidth = tester.getSize(segmentedFinder).width;
+      expect(segmentedWidth, equals(368.0));
     });
   });
 }

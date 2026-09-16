@@ -55,7 +55,7 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(hh, enabled: false),
-          const SizedBox(height: HHSpacing.sm),
+          const SizedBox(height: HHSpacing.md),
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: HHSpacing.screenPadding,
@@ -75,7 +75,7 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(hh, enabled: true),
-            const SizedBox(height: HHSpacing.sm),
+            const SizedBox(height: HHSpacing.md),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: HHSpacing.screenPadding,
@@ -93,42 +93,51 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
       padding: const EdgeInsets.symmetric(
         horizontal: HHSpacing.screenPadding,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'TRAFFIC & ANALYTICS',
-            style: hh.caption2().copyWith(color: hh.textTertiary),
-          ),
-          CupertinoSlidingSegmentedControl<AnalyticsTimeframe>(
-            groupValue: _timeframe,
-            thumbColor: hh.bgElevated2,
-            backgroundColor: hh.fill.withValues(alpha: 0.35),
-            children: {
-              for (final tf in AnalyticsTimeframe.values)
-                tf: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Text(
-                    tf.label,
-                    style: hh.caption2().copyWith(
-                          color: _timeframe == tf
-                              ? hh.textPrimary
-                              : hh.textTertiary,
-                          fontWeight: _timeframe == tf
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                        ),
-                  ),
+            style: hh.caption2().copyWith(
+                  color: hh.textTertiary,
+                  letterSpacing: 0.6,
+                  fontWeight: FontWeight.w600,
                 ),
-            },
-            onValueChanged: (val) {
-              if (enabled && val != null && val != _timeframe) {
-                HapticFeedback.selectionClick();
-                setState(() {
-                  _timeframe = val;
-                });
-              }
-            },
+          ),
+          const SizedBox(height: HHSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: CupertinoSlidingSegmentedControl<AnalyticsTimeframe>(
+              groupValue: _timeframe,
+              thumbColor: hh.bgElevated2,
+              backgroundColor: hh.fill.withValues(alpha: 0.35),
+              children: {
+                for (final tf in AnalyticsTimeframe.values)
+                  tf: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 7),
+                    child: Text(
+                      tf.label,
+                      textAlign: TextAlign.center,
+                      style: hh.caption2().copyWith(
+                            color: _timeframe == tf
+                                ? hh.textPrimary
+                                : hh.textTertiary,
+                            fontWeight: _timeframe == tf
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                    ),
+                  ),
+              },
+              onValueChanged: (val) {
+                if (enabled && val != null && val != _timeframe) {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _timeframe = val;
+                  });
+                }
+              },
+            ),
           ),
         ],
       ),

@@ -36,47 +36,54 @@ class CacheHitBar extends StatelessWidget {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Edge Cache Efficiency',
-                    style: hh.caption().copyWith(color: hh.textTertiary),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        '${cache.hitRate.toStringAsFixed(1)}%',
-                        style: hh.title2().copyWith(
-                              color: hh.statusReady,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: hh.statusReady.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'OPTIMIZED',
-                          style: hh.caption2().copyWith(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edge Cache Efficiency',
+                      style: hh.caption().copyWith(color: hh.textTertiary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          '${cache.hitRate.toStringAsFixed(1)}%',
+                          style: hh.title2().copyWith(
                                 color: hh.statusReady,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
+                                fontWeight: FontWeight.w700,
                               ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: hh.statusReady.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'OPTIMIZED',
+                            style: hh.caption2().copyWith(
+                                  color: hh.statusReady,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: HHSpacing.sm),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -133,8 +140,9 @@ class CacheHitBar extends StatelessWidget {
           const SizedBox(height: HHSpacing.sm),
 
           // Legend Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: HHSpacing.md,
+            runSpacing: 4,
             children: [
               _LegendItem(
                 color: hh.statusReady,

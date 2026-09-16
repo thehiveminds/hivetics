@@ -36,7 +36,7 @@ class _DeploysScreenState extends ConsumerState<DeploysScreen> {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        const AppNavBar(title: 'Deploys'),
+        const AppNavBar(title: 'Deploys', showBackButton: false),
 
         SliverToBoxAdapter(
           child: _FilterRow(

@@ -328,28 +328,44 @@ class _AddConnectionSheetState extends ConsumerState<AddConnectionSheet> {
         },
       );
     } else {
-      // Registrar
+      final Credential cred;
       if (_registrarProvider == RegistrarId.porkbun) {
         if (_token.isEmpty || _secretKey.isEmpty) {
           setState(() =>
               _errorMessage = 'Please enter both API Key and Secret Key');
           return;
         }
+        cred = KeyPairCredential(
+          apiKey: _token.trim(),
+          secretKey: _secretKey.trim(),
+        );
+      } else if (_registrarProvider == RegistrarId.godaddy) {
+        if (_token.isEmpty) {
+          setState(() =>
+              _errorMessage = 'Please enter your GoDaddy API Key or Token');
+          return;
+        }
+        if (_secretKey.isNotEmpty) {
+          cred = KeyPairCredential(
+            apiKey: _token.trim(),
+            secretKey: _secretKey.trim(),
+          );
+        } else if (_token.contains(':')) {
+          final parts = _token.split(':');
+          cred = KeyPairCredential(
+            apiKey: parts[0].trim(),
+            secretKey: parts.sublist(1).join(':').trim(),
+          );
+        } else {
+          cred = BearerCredential(token: _token.trim());
+        }
       } else {
         if (_token.isEmpty) {
           setState(() => _errorMessage = 'Please paste your API token above');
           return;
         }
+        cred = BearerCredential(token: _token.trim());
       }
-
-      setState(() {
-        _step = _Step.validating;
-        _errorMessage = null;
-      });
-
-      final Credential cred = _registrarProvider == RegistrarId.porkbun
-          ? KeyPairCredential(apiKey: _token, secretKey: _secretKey)
-          : BearerCredential(token: _token);
 
       final result = await ref
           .read(connectionsProvider.notifier)
@@ -1019,7 +1035,7 @@ class _CredentialsEntry extends StatelessWidget {
 
     return switch (registrarProvider!) {
       RegistrarId.godaddy =>
-        '1. Go to developer.godaddy.com/keys\n2. Click "Create New API Key" (choose "Production") or generate a Personal Access Token (PAT)\n3. Copy the token and paste it above.\n\nNote: Requires at least 1 active domain in your GoDaddy account.',
+        '1. Go to developer.godaddy.com/keys\n2. Click "Create New API Key" (choose "Production") or generate a Personal Access Token (PAT)\n3. Enter your Key and Secret (or paste your PAT)\n\nNote: Requires at least 1 active domain in your GoDaddy account.',
       RegistrarId.porkbun =>
         '1. Go to porkbun.com/account/api\n2. Generate an API Key and API Secret\n3. In your Porkbun Domain Management list, ensure "API Access" is enabled for the domains you want visible here\n4. Paste both keys above',
       RegistrarId.cloudflareregistrar =>

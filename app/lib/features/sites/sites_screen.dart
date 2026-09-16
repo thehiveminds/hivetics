@@ -41,6 +41,7 @@ class _SitesScreenState extends ConsumerState<SitesScreen> {
       slivers: [
         AppNavBar(
           title: 'Sites',
+          showBackButton: false,
           trailing: [
             AppPressable(
               onTap: _openAddConnection,

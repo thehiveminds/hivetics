@@ -11,6 +11,7 @@ class AppNavBar extends StatelessWidget {
     this.trailing,
     this.bottom,
     this.pinned = true,
+    this.showBackButton,
   });
 
   final String title;
@@ -23,10 +24,16 @@ class AppNavBar extends StatelessWidget {
 
   final bool pinned;
 
+  /// Explicit control of back button.
+  /// Set to false on root tab screens so modal sheets never cause a back button to appear.
+  final bool? showBackButton;
+
   @override
   Widget build(BuildContext context) {
     final hh = context.hh;
-    final canPop = Navigator.canPop(context);
+    final route = ModalRoute.of(context);
+    final canPop = showBackButton ??
+        (route != null && route.canPop && !route.isFirst);
 
     return SliverAppBar(
       pinned: pinned,

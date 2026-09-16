@@ -6,7 +6,9 @@ import '../../models/credential.dart';
 /// Header set for a credential. Both shapes are plain headers — never a
 /// query param, never a POST body field (Porkbun's old auth style).
 Map<String, String> credentialHeaders(Credential credential) => switch (credential) {
-      BearerCredential(:final token) => {'Authorization': 'Bearer $token'},
+      BearerCredential(:final token) => {
+          'Authorization': _formatAuthToken(token),
+        },
       KeyPairCredential(:final apiKey, :final secretKey) => {
           'X-API-Key': apiKey,
           'X-Secret-API-Key': secretKey,
@@ -15,6 +17,17 @@ Map<String, String> credentialHeaders(Credential credential) => switch (credenti
           'Authorization': 'Bearer $accessToken',
         },
     };
+
+String _formatAuthToken(String token) {
+  final trimmed = token.trim();
+  if (trimmed.startsWith('sso-key ') || trimmed.startsWith('Bearer ')) {
+    return trimmed;
+  }
+  if (trimmed.contains(':')) {
+    return 'sso-key $trimmed';
+  }
+  return 'Bearer $trimmed';
+}
 
 class AuthInterceptor extends Interceptor {
   const AuthInterceptor({required this.credential});

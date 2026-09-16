@@ -18,14 +18,13 @@ class ProviderBadge extends StatelessWidget {
   final ProviderId providerId;
   final double size;
 
-  /// Force a text label alongside the badge. Always true for Cloudflare.
+  /// Optional text label alongside the badge.
   final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
     final hh = context.hh;
     final config = _config(providerId, hh);
-    final alwaysLabel = providerId == ProviderId.cloudflarepages || showLabel;
 
     final badge = Container(
       width: size,
@@ -48,7 +47,7 @@ class ProviderBadge extends StatelessWidget {
       ),
     );
 
-    if (!alwaysLabel) return badge;
+    if (!showLabel) return badge;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -101,8 +100,6 @@ class RegistrarBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final hh = context.hh;
     final config = _config(registrarId, hh);
-    final alwaysLabel =
-        registrarId == RegistrarId.cloudflareregistrar || showLabel;
 
     final badge = Container(
       width: size,
@@ -125,7 +122,7 @@ class RegistrarBadge extends StatelessWidget {
       ),
     );
 
-    if (!alwaysLabel) return badge;
+    if (!showLabel) return badge;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

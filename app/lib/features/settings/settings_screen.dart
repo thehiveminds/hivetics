@@ -30,7 +30,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return CustomScrollView(
       slivers: [
-        const AppNavBar(title: 'Settings'),
+        const AppNavBar(title: 'Settings', showBackButton: false),
 
         SliverPadding(
           padding: const EdgeInsets.symmetric(vertical: HHSpacing.lg),

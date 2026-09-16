@@ -14,6 +14,9 @@ String relativeTime(DateTime? dt) {
   return DateFormat('d MMM').format(dt.toLocal());
 }
 
+/// Formatted calendar date — e.g. \"15 Oct 2026\".
+String formatDate(DateTime dt) => DateFormat('d MMM y').format(dt.toLocal());
+
 /// Absolute date for deploy groups — \"Today\", \"Yesterday\", \"15 Sep\".
 String deployGroupLabel(DateTime dt) {
   final now = DateTime.now();

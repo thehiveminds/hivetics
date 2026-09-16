@@ -106,34 +106,62 @@ class GoDaddyProvider implements RegistrarProvider {
     String domain,
   ) async {
     final dio = _client(credential);
+
+    // 1. Try v1 endpoint first
     try {
       final res = await dio.get<dynamic>('/v1/domains/$domain/records');
       final rawList = (res.data is List ? res.data as List : []);
-
-      final records = rawList.map((raw) {
-        final m = raw as Map<String, dynamic>;
-        final type = m['type'] as String? ?? '';
-        final name = m['name'] as String? ?? '';
-        final content = (m['data'] ?? m['content'] ?? '') as String;
-        final id = '${type}_${name}_$content';
-
-        return DnsRecord(
-          id: id,
-          domain: domain,
-          type: type,
-          name: name,
-          content: content,
-          ttl: parseDnsTtl(m['ttl']),
-          priority: parseDnsPriority(m['priority'] ?? m['prio']),
-          proxied: false,
-        );
-      }).toList();
-
-      return Ok(records);
+      if (rawList.isNotEmpty) {
+        return Ok(_parseRecords(rawList, domain));
+      }
     } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status != 404 && status != 422 && status != 400) {
+        return Err(dioExceptionToApiException(e));
+      }
+      // If 404/422/400, proceed to try v3 fallback
+    } catch (_) {}
+
+    // 2. Try v3 endpoint fallback
+    try {
+      final res = await dio.get<dynamic>('/v3/domains/zones/$domain/dns-records');
+      final dynamic data = res.data;
+      final rawList = (data is List
+          ? data
+          : (data is Map && data['records'] is List
+              ? data['records'] as List
+              : []));
+      return Ok(_parseRecords(rawList, domain));
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      // 404 or 422 means domain uses external nameservers or has no DNS records on GoDaddy
+      if (status == 404 || status == 422) {
+        return const Ok(<DnsRecord>[]);
+      }
       return Err(dioExceptionToApiException(e));
     } catch (e) {
       return Err(UnknownException.fromError(e));
     }
+  }
+
+  List<DnsRecord> _parseRecords(List<dynamic> rawList, String domain) {
+    return rawList.map((raw) {
+      final m = raw as Map<String, dynamic>;
+      final type = m['type'] as String? ?? '';
+      final name = m['name'] as String? ?? '';
+      final content = (m['data'] ?? m['content'] ?? '') as String;
+      final id = '${type}_${name}_$content';
+
+      return DnsRecord(
+        id: id,
+        domain: domain,
+        type: type,
+        name: name,
+        content: content,
+        ttl: parseDnsTtl(m['ttl']),
+        priority: parseDnsPriority(m['priority'] ?? m['prio']),
+        proxied: false,
+      );
+    }).toList();
   }
 }

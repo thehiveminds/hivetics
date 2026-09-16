@@ -73,38 +73,59 @@ class GoDaddyProvider implements RegistrarProvider {
   ) async {
     final dio = _client(credential);
     try {
-      final res = await dio.get<dynamic>(
-        '/v1/domains?includes=nameServers&limit=1000',
-      );
-      final rawList = (res.data is List ? res.data as List : []);
+      final allDomains = <RegisteredDomain>[];
+      String? marker;
+      const limit = 1000;
 
-      final domains = rawList.map((raw) {
-        final m = raw as Map<String, dynamic>;
-        final rawDomain = (m['domain'] as String? ?? '').trim();
-        final rawStatus = m['status'] as String?;
-        final nsList =
-            (m['nameServers'] as List?)
-                ?.map((ns) => ns.toString().trim())
-                .where((ns) => ns.isNotEmpty)
-                .toList() ??
-            const <String>[];
+      while (true) {
+        final query = StringBuffer('/v1/domains?includes=nameServers&limit=$limit');
+        if (marker != null && marker.isNotEmpty) {
+          query.write('&marker=${Uri.encodeQueryComponent(marker)}');
+        }
 
-        return RegisteredDomain(
-          domain: rawDomain,
-          connectionId: c.id,
-          registrar: RegistrarId.godaddy,
-          status: normalizeGoDaddyStatus(rawStatus),
-          rawStatus: rawStatus,
-          expiresAt: parseIso8601Timestamp(m['expires']),
-          autoRenew: m['renewAuto'] as bool?,
-          locked: m['locked'] as bool?,
-          privacy: (m['privacy'] ?? m['v1-privacy']) as bool?,
-          nameServers: nsList,
-          fetchedAt: DateTime.now().toUtc(),
-        );
-      }).toList();
+        final res = await dio.get<dynamic>(query.toString());
+        final rawList = (res.data is List ? res.data as List : []);
+        if (rawList.isEmpty) break;
 
-      return Ok(domains);
+        String? lastDomain;
+        for (final raw in rawList) {
+          final m = raw as Map<String, dynamic>;
+          final rawDomain = (m['domain'] as String? ?? '').trim();
+          final rawStatus = m['status'] as String?;
+          final nsList =
+              (m['nameServers'] as List?)
+                  ?.map((ns) => ns.toString().trim())
+                  .where((ns) => ns.isNotEmpty)
+                  .toList() ??
+              const <String>[];
+
+          allDomains.add(
+            RegisteredDomain(
+              domain: rawDomain,
+              connectionId: c.id,
+              registrar: RegistrarId.godaddy,
+              status: normalizeGoDaddyStatus(rawStatus),
+              rawStatus: rawStatus,
+              expiresAt: parseIso8601Timestamp(m['expires']),
+              autoRenew: m['renewAuto'] as bool?,
+              locked: m['locked'] as bool?,
+              privacy: (m['privacy'] ?? m['v1-privacy']) as bool?,
+              nameServers: nsList,
+              fetchedAt: DateTime.now().toUtc(),
+            ),
+          );
+          if (rawDomain.isNotEmpty) {
+            lastDomain = rawDomain;
+          }
+        }
+
+        if (rawList.length < limit || lastDomain == null || lastDomain == marker) {
+          break;
+        }
+        marker = lastDomain;
+      }
+
+      return Ok(allDomains);
     } on DioException catch (e) {
       return Err(dioExceptionToApiException(e));
     } catch (e) {

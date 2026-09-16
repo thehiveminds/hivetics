@@ -53,43 +53,57 @@ class NetlifyProvider implements HostingProvider {
   @override
   Future<Result<List<Project>>> listProjects(Connection c, String token) async {
     final dio = _client(token);
+    // Spec §1.3: paginated — loop until page returns < 100 items.
+    final allProjects = <Project>[];
+    int page = 1;
+    const int perPage = 100;
+
     try {
-      // Returns a bare JSON array. published_deploy embedded — one call only.
-      final res = await dio.get<List<dynamic>>('/sites?per_page=100');
-      final rawList = res.data ?? [];
+      while (true) {
+        final res = await dio.get<List<dynamic>>(
+          '/sites?per_page=$perPage&page=$page',
+        );
+        final rawList = res.data ?? [];
+        if (rawList.isEmpty) break;
 
-      final projects = rawList.map((raw) {
-        final m = raw as Map<String, dynamic>;
-        final siteId = m['id'] as String? ?? '';
+        for (final raw in rawList) {
+          final m = raw as Map<String, dynamic>;
+          final siteId = m['id'] as String? ?? '';
 
-        // Collect domain aliases — custom_domain is the primary.
-        final domains = <String>[];
-        final custom = m['custom_domain'] as String?;
-        if (custom != null && custom.isNotEmpty) domains.add(custom);
-        final aliases = (m['domain_aliases'] as List?)?.cast<String>() ?? [];
-        domains.addAll(aliases);
-        Deployment? latestDeploy;
-        final pub = m['published_deploy'];
-        if (pub != null && pub is Map<String, dynamic>) {
-          latestDeploy = _mapDeployment(pub, siteId, c.id);
+          // Collect domain aliases — custom_domain is the primary.
+          final domains = <String>[];
+          final custom = m['custom_domain'] as String?;
+          if (custom != null && custom.isNotEmpty) domains.add(custom);
+          final aliases = (m['domain_aliases'] as List?)?.cast<String>() ?? [];
+          domains.addAll(aliases);
+
+          Deployment? latestDeploy;
+          final pub = m['published_deploy'];
+          if (pub != null && pub is Map<String, dynamic>) {
+            latestDeploy = _mapDeployment(pub, siteId, c.id);
+          }
+
+          allProjects.add(Project(
+            id: siteId,
+            connectionId: c.id,
+            providerId: ProviderId.netlify,
+            name: m['name'] as String? ?? siteId,
+            // `framework` lives on the deploy object, not on build_settings.
+            framework: (pub is Map ? pub['framework'] : null) as String?,
+            productionBranch: (m['build_settings'] as Map?)?['repo_branch'] as String?,
+            domains: domains,
+            latestDeployment: latestDeploy,
+            updatedAt: parseIso8601Timestamp(m['updated_at']),
+            fetchedAt: DateTime.now().toUtc(),
+          ));
         }
 
-        return Project(
-          id: siteId,
-          connectionId: c.id,
-          providerId: ProviderId.netlify,
-          name: m['name'] as String? ?? siteId,
-          // `framework` lives on the deploy object, not on build_settings.
-          framework: (pub is Map ? pub['framework'] : null) as String?,
-          productionBranch: (m['build_settings'] as Map?)?['repo_branch'] as String?,
-          domains: domains,
-          latestDeployment: latestDeploy,
-          updatedAt: parseIso8601Timestamp(m['updated_at']),
-          fetchedAt: DateTime.now().toUtc(),
-        );
-      }).toList();
+        // Spec: stop when page returns < perPage items.
+        if (rawList.length < perPage) break;
+        page++;
+      }
 
-      return Ok(projects);
+      return Ok(allProjects);
     } on DioException catch (e) {
       return Err(dioExceptionToApiException(e));
     } catch (e) {

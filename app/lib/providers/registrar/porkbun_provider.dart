@@ -69,40 +69,56 @@ class PorkbunProvider implements RegistrarProvider {
   ) async {
     final dio = _client(credential);
     try {
-      final res = await dio.get<Map<String, dynamic>>('/domain/listAll');
-      final data = res.data;
-      if (data == null) {
-        return const Err(UnknownException('Empty response from Porkbun'));
+      final allDomains = <RegisteredDomain>[];
+      int start = 0;
+      const batchSize = 1000;
+
+      while (true) {
+        final path = start == 0 ? '/domain/listAll' : '/domain/listAll?start=$start';
+        final res = await dio.get<Map<String, dynamic>>(path);
+        final data = res.data;
+        if (data == null) {
+          if (allDomains.isNotEmpty) break;
+          return const Err(UnknownException('Empty response from Porkbun'));
+        }
+
+        final status = data['status'] as String?;
+        if (status != 'SUCCESS') {
+          if (allDomains.isNotEmpty) break;
+          final msg =
+              data['message'] as String? ?? 'Failed to list Porkbun domains';
+          return Err(UnknownException(msg));
+        }
+
+        final domainsList = (data['domains'] as List?) ?? [];
+        if (domainsList.isEmpty) break;
+
+        for (final raw in domainsList) {
+          final m = raw as Map<String, dynamic>;
+          final rawDomain = (m['domain'] as String? ?? '').trim();
+          final rawStatus = m['status'] as String?;
+
+          allDomains.add(
+            RegisteredDomain(
+              domain: rawDomain,
+              connectionId: c.id,
+              registrar: RegistrarId.porkbun,
+              status: normalizePorkbunStatus(rawStatus),
+              rawStatus: rawStatus,
+              expiresAt: parsePorkbunDate(m['expireDate']),
+              autoRenew: parsePorkbunBool(m['autoRenew']),
+              locked: parsePorkbunBool(m['securityLock']),
+              privacy: parsePorkbunBool(m['whoisPrivacy']),
+              fetchedAt: DateTime.now().toUtc(),
+            ),
+          );
+        }
+
+        if (domainsList.length < batchSize) break;
+        start += batchSize;
       }
 
-      final status = data['status'] as String?;
-      if (status != 'SUCCESS') {
-        final msg =
-            data['message'] as String? ?? 'Failed to list Porkbun domains';
-        return Err(UnknownException(msg));
-      }
-
-      final domainsList = (data['domains'] as List?) ?? [];
-      final result = domainsList.map((raw) {
-        final m = raw as Map<String, dynamic>;
-        final rawDomain = (m['domain'] as String? ?? '').trim();
-        final rawStatus = m['status'] as String?;
-
-        return RegisteredDomain(
-          domain: rawDomain,
-          connectionId: c.id,
-          registrar: RegistrarId.porkbun,
-          status: normalizePorkbunStatus(rawStatus),
-          rawStatus: rawStatus,
-          expiresAt: parsePorkbunDate(m['expireDate']),
-          autoRenew: parsePorkbunBool(m['autoRenew']),
-          locked: parsePorkbunBool(m['securityLock']),
-          privacy: parsePorkbunBool(m['whoisPrivacy']),
-          fetchedAt: DateTime.now().toUtc(),
-        );
-      }).toList();
-
-      return Ok(result);
+      return Ok(allDomains);
     } on DioException catch (e) {
       return Err(dioExceptionToApiException(e));
     } catch (e) {

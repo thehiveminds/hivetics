@@ -23,9 +23,9 @@ Remaining 7 (Railway, Render, DigitalOcean, Heroku, Fly.io, Firebase Hosting, AW
 - Deploy duration: `queued.started_on` → `deploy.ended_on`.
 - Commit info from `deployment_trigger.metadata` (`branch`, `commit_message`, `commit_hash`).
 
-### Netlify — ⚠️ Missing Pagination (Bug #1)
+### Netlify — ✅ Correct (Pagination Fixed)
 - `/user` validation ✅
-- `GET /sites?per_page=100` — **only fetches one page; spec requires paginated loop until array is empty**.
+- `GET /sites?per_page=100&page={page}` — paginated loop fetches all pages until response returns < 100 items ✅
 - Deploy fields: `id`, `state`, `context`, `commit_ref`, `error_message`, `deploy_time`, `ssl_url` ✅
 
 ---
@@ -35,15 +35,15 @@ Remaining 7 (Railway, Render, DigitalOcean, Heroku, Fly.io, Firebase Hosting, AW
 > **Design note**: Namecheap (§2.2 in the reference doc) is intentionally replaced by **Cloudflare Registrar**,
 > which reuses the Cloudflare Pages connection. Not a bug.
 
-### GoDaddy — ⚠️ Missing Cursor Pagination (Bug #2)
+### GoDaddy — ✅ Correct (Cursor Pagination Fixed)
 - Auth: `Authorization: sso-key {apiKey}:{apiSecret}` ✅
-- `GET /v1/domains?limit=1000&includes=nameServers` — **no marker cursor loop; spec requires repeating with `marker={lastDomainName}` until `count < 1000`**.
+- `GET /v1/domains?limit=1000&includes=nameServers{&marker=}` — marker cursor pagination loop implemented (`marker={lastDomainName}`) until count < 1000 or marker repeats ✅
 - Field mapping: `domain`, `status`, `expires`, `renewAuto`, `locked`, `privacy`, `nameServers[]` ✅
 - DNS: tries v1 (`/v1/domains/{domain}/records`) then v3 fallback (`/v3/domains/zones/{domain}/dns-records`) ✅
 
-### Porkbun — ⚠️ Missing Offset Pagination (Bug #3)
+### Porkbun — ✅ Correct (Offset Pagination Fixed)
 - Auth: `X-API-Key` + `X-Secret-API-Key` via `KeyPairCredential` → `AuthInterceptor` ✅
-- `GET /domain/listAll` — **no `start` offset param and no loop; spec requires `start=0, 1000, 2000...` until `count < 1000`**.
+- `GET /domain/listAll{?start=}` — `start=0, 1000, 2000...` offset loop implemented, terminates when batch count < 1000 ✅
 - Field mapping: `domain`, `status`, `expireDate`, `autoRenew`, `securityLock` (→ locked), `whoisPrivacy` (→ privacy) ✅
 - DNS: `GET /dns/retrieve/{domain}` ✅
 
@@ -109,13 +109,13 @@ GoDaddy's `sso-key` format is built in the provider via `extraHeaders` + `_forma
 
 ---
 
-## Bugs to Fix
-
-| # | File | Issue | Spec Reference |
+## Resolved Bugs
+ 
+| # | File | Issue | Status |
 |---|---|---|---|
-| 1 | `netlify_provider.dart` | `listProjects` only fetches page 1; no pagination loop | §1.3 — loop until array is empty |
-| 2 | `godaddy_provider.dart` | `listDomains` no cursor loop; stops at first 1000 | §2.8 — `marker={lastDomainName}` pagination |
-| 3 | `porkbun_provider.dart` | `listDomains` no `start` offset loop; only first batch | §2.3 — `start=0,1000,2000...` |
+| 1 | `netlify_provider.dart` | `listProjects` only fetched page 1; no pagination loop | ✅ Resolved (loops `page=1,2...` until `< 100`) |
+| 2 | `godaddy_provider.dart` | `listDomains` no cursor loop; stopped at first 1000 | ✅ Resolved (`marker={lastDomainName}` cursor loop) |
+| 3 | `porkbun_provider.dart` | `listDomains` no `start` offset loop; only first batch | ✅ Resolved (`start=0,1000,2000...` offset loop) |
 
 ---
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../models/connection.dart';
 import '../../../models/project_analytics.dart';
 import '../../../models/site.dart';
 import '../../../shared/theme.dart';
@@ -34,6 +35,11 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
 
   @override
   Widget build(BuildContext context) {
+    // Only Vercel projects support traffic and performance analytics
+    if (widget.site.hostProject?.providerId != ProviderId.vercel) {
+      return const SizedBox.shrink();
+    }
+
     final hh = context.hh;
     final analyticsAsync = ref.watch(
       projectAnalyticsProvider((
@@ -43,219 +49,270 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
       )),
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Section Header & Timeframe Picker
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: HHSpacing.screenPadding,
+    return analyticsAsync.when(
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(hh, enabled: false),
+          const SizedBox(height: HHSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: HHSpacing.screenPadding,
+            ),
+            child: _buildSkeleton(hh),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'TRAFFIC & ANALYTICS',
-                style: hh.caption2().copyWith(color: hh.textTertiary),
+        ],
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (data) {
+        // If data is unavailable, do not show filters or orphaned empty space
+        if (data == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(hh, enabled: true),
+            const SizedBox(height: HHSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: HHSpacing.screenPadding,
               ),
-              // Cupertino Segmented Control (§0 in DESIGN.md)
-              CupertinoSlidingSegmentedControl<AnalyticsTimeframe>(
-                groupValue: _timeframe,
-                thumbColor: hh.bgElevated2,
-                backgroundColor: hh.fill.withValues(alpha: 0.35),
-                children: {
-                  for (final tf in AnalyticsTimeframe.values)
-                    tf: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Text(
-                        tf.label,
-                        style: hh.caption2().copyWith(
-                              color: _timeframe == tf
-                                  ? hh.textPrimary
-                                  : hh.textTertiary,
-                              fontWeight: _timeframe == tf
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                            ),
-                      ),
-                    ),
-                },
-                onValueChanged: (val) {
-                  if (val != null && val != _timeframe) {
-                    HapticFeedback.selectionClick();
-                    setState(() {
-                      _timeframe = val;
-                    });
-                  }
-                },
+              child: _buildContentCard(context, hh, data),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(HHTokens hh, {bool enabled = true}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: HHSpacing.screenPadding,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'TRAFFIC & ANALYTICS',
+            style: hh.caption2().copyWith(color: hh.textTertiary),
+          ),
+          CupertinoSlidingSegmentedControl<AnalyticsTimeframe>(
+            groupValue: _timeframe,
+            thumbColor: hh.bgElevated2,
+            backgroundColor: hh.fill.withValues(alpha: 0.35),
+            children: {
+              for (final tf in AnalyticsTimeframe.values)
+                tf: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(
+                    tf.label,
+                    style: hh.caption2().copyWith(
+                          color: _timeframe == tf
+                              ? hh.textPrimary
+                              : hh.textTertiary,
+                          fontWeight: _timeframe == tf
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                  ),
+                ),
+            },
+            onValueChanged: (val) {
+              if (enabled && val != null && val != _timeframe) {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _timeframe = val;
+                });
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(HHTokens hh) {
+    return Container(
+      height: 380,
+      padding: const EdgeInsets.all(HHSpacing.md),
+      decoration: BoxDecoration(
+        color: hh.bgElevated,
+        borderRadius: HHRadius.cardBr(),
+        border: Border.all(
+          color: hh.cardBorder.withValues(alpha: 0.7),
+          width: 0.5,
+        ),
+        boxShadow: hh.cardShadow,
+      ),
+      child: const Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: Skeleton(width: double.infinity, height: 70)),
+              SizedBox(width: 8),
+              Expanded(child: Skeleton(width: double.infinity, height: 70)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: Skeleton(width: double.infinity, height: 70)),
+              SizedBox(width: 8),
+              Expanded(child: Skeleton(width: double.infinity, height: 70)),
+            ],
+          ),
+          SizedBox(height: 16),
+          Expanded(child: Skeleton(width: double.infinity, height: 180)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentCard(BuildContext context, HHTokens hh, ProjectAnalytics data) {
+    final activeTimeseries = data.getTimeseriesForMetric(_selectedMetric);
+    final activeColor = _colorForMetric(_selectedMetric, hh);
+
+    return Container(
+      padding: const EdgeInsets.all(HHSpacing.md),
+      decoration: BoxDecoration(
+        color: hh.bgElevated,
+        borderRadius: HHRadius.cardBr(),
+        border: Border.all(
+          color: hh.cardBorder.withValues(alpha: 0.7),
+          width: 0.5,
+        ),
+        boxShadow: hh.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Metric Selector Grid (4 interactive tiles with dedicated metric colors)
+          Row(
+            children: [
+              Expanded(
+                child: _MetricTile(
+                  type: AnalyticsMetricType.pageViews,
+                  value: data.formatValue(AnalyticsMetricType.pageViews),
+                  delta: data.pageViewsDelta,
+                  isSelected: _selectedMetric == AnalyticsMetricType.pageViews,
+                  activeColor: _colorForMetric(AnalyticsMetricType.pageViews, hh),
+                  hh: hh,
+                  onTap: () => _setMetric(AnalyticsMetricType.pageViews),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MetricTile(
+                  type: AnalyticsMetricType.visitors,
+                  value: data.formatValue(AnalyticsMetricType.visitors),
+                  delta: data.visitorsDelta,
+                  isSelected: _selectedMetric == AnalyticsMetricType.visitors,
+                  activeColor: _colorForMetric(AnalyticsMetricType.visitors, hh),
+                  hh: hh,
+                  onTap: () => _setMetric(AnalyticsMetricType.visitors),
+                ),
               ),
             ],
           ),
-        ),
-
-        const SizedBox(height: HHSpacing.sm),
-
-        // Main Content Card
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: HHSpacing.screenPadding,
-          ),
-          child: analyticsAsync.when(
-            loading: () => Container(
-              height: 380,
-              padding: const EdgeInsets.all(HHSpacing.md),
-              decoration: BoxDecoration(
-                color: hh.bgElevated,
-                borderRadius: HHRadius.cardBr(),
-                border: Border.all(
-                  color: hh.cardBorder.withValues(alpha: 0.7),
-                  width: 0.5,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricTile(
+                  type: AnalyticsMetricType.requests,
+                  value: data.formatValue(AnalyticsMetricType.requests),
+                  delta: data.requestsDelta,
+                  isSelected: _selectedMetric == AnalyticsMetricType.requests,
+                  activeColor: _colorForMetric(AnalyticsMetricType.requests, hh),
+                  hh: hh,
+                  onTap: () => _setMetric(AnalyticsMetricType.requests),
                 ),
-                boxShadow: hh.cardShadow,
               ),
-              child: const Column(
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MetricTile(
+                  type: AnalyticsMetricType.cacheHitRate,
+                  value: data.formatValue(AnalyticsMetricType.cacheHitRate),
+                  delta: null,
+                  isSelected: _selectedMetric == AnalyticsMetricType.cacheHitRate,
+                  activeColor: _colorForMetric(AnalyticsMetricType.cacheHitRate, hh),
+                  hh: hh,
+                  onTap: () => _setMetric(AnalyticsMetricType.cacheHitRate),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: HHSpacing.md),
+
+          // Trend Chart Header (Active metric title + timeframe)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: Skeleton(width: double.infinity, height: 70)),
-                      SizedBox(width: 8),
-                      Expanded(child: Skeleton(width: double.infinity, height: 70)),
-                    ],
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: activeColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: Skeleton(width: double.infinity, height: 70)),
-                      SizedBox(width: 8),
-                      Expanded(child: Skeleton(width: double.infinity, height: 70)),
-                    ],
+                  const SizedBox(width: 6),
+                  Text(
+                    _metricTrendTitle(_selectedMetric),
+                    style: hh.caption2().copyWith(
+                          color: activeColor,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
                   ),
-                  SizedBox(height: 16),
-                  Expanded(child: Skeleton(width: double.infinity, height: 180)),
                 ],
               ),
-            ),
-            error: (e, _) => Container(
-              padding: const EdgeInsets.all(HHSpacing.md),
-              decoration: BoxDecoration(
-                color: hh.bgElevated,
-                borderRadius: BorderRadius.circular(HHRadius.card),
+              Text(
+                _timeframe.label.toUpperCase(),
+                style: hh.caption2().copyWith(
+                      color: hh.textTertiary,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
               ),
-              child: Text(
-                'Unable to load traffic analytics',
-                style: hh.subhead().copyWith(color: hh.textTertiary),
-              ),
-            ),
-            data: (data) {
-              if (data == null) {
-                return const SizedBox.shrink();
-              }
-
-              final activeTimeseries = data.getTimeseriesForMetric(_selectedMetric);
-              final activeColor = _selectedMetric == AnalyticsMetricType.cacheHitRate
-                  ? hh.statusReady
-                  : hh.accent;
-
-              return Container(
-                padding: const EdgeInsets.all(HHSpacing.md),
-                decoration: BoxDecoration(
-                  color: hh.bgElevated,
-                  borderRadius: HHRadius.cardBr(),
-                  border: Border.all(
-                    color: hh.cardBorder.withValues(alpha: 0.7),
-                    width: 0.5,
-                  ),
-                  boxShadow: hh.cardShadow,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Metric Selector Grid (4 interactive tiles)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MetricTile(
-                            type: AnalyticsMetricType.pageViews,
-                            value: data.formatValue(AnalyticsMetricType.pageViews),
-                            delta: data.pageViewsDelta,
-                            isSelected: _selectedMetric == AnalyticsMetricType.pageViews,
-                            hh: hh,
-                            onTap: () => _setMetric(AnalyticsMetricType.pageViews),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _MetricTile(
-                            type: AnalyticsMetricType.visitors,
-                            value: data.formatValue(AnalyticsMetricType.visitors),
-                            delta: data.visitorsDelta,
-                            isSelected: _selectedMetric == AnalyticsMetricType.visitors,
-                            hh: hh,
-                            onTap: () => _setMetric(AnalyticsMetricType.visitors),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MetricTile(
-                            type: AnalyticsMetricType.requests,
-                            value: data.formatValue(AnalyticsMetricType.requests),
-                            delta: data.requestsDelta,
-                            isSelected: _selectedMetric == AnalyticsMetricType.requests,
-                            hh: hh,
-                            onTap: () => _setMetric(AnalyticsMetricType.requests),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _MetricTile(
-                            type: AnalyticsMetricType.cacheHitRate,
-                            value: data.formatValue(AnalyticsMetricType.cacheHitRate),
-                            delta: null,
-                            isSelected: _selectedMetric == AnalyticsMetricType.cacheHitRate,
-                            hh: hh,
-                            onTap: () => _setMetric(AnalyticsMetricType.cacheHitRate),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: HHSpacing.md),
-
-                    // iOS Trend Chart
-                    IosTrendChart(
-                      points: activeTimeseries,
-                      lineColor: activeColor,
-                      height: 175,
-                      valueFormatter: (val) => _formatMetricVal(val, _selectedMetric),
-                      unit: _selectedMetric == AnalyticsMetricType.cacheHitRate ? '%' : '',
-                    ),
-
-                    const SizedBox(height: HHSpacing.lg),
-
-                    // Cache Efficiency Breakdown
-                    CacheHitBar(
-                      cache: data.cache,
-                      formattedBandwidth: data.formatBandwidth(),
-                    ),
-
-                    if (!data.isWebAnalyticsEnabled) ...[
-                      const SizedBox(height: HHSpacing.md),
-                      _NoticeBanner(
-                        site: widget.site,
-                        hh: hh,
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            },
+            ],
           ),
-        ),
-      ],
+
+          const SizedBox(height: HHSpacing.xs),
+
+          // iOS Trend Chart (distinct curve per metric with matching line color & key-driven reset)
+          IosTrendChart(
+            key: ValueKey('${_selectedMetric.name}_${_timeframe.name}'),
+            points: activeTimeseries,
+            lineColor: activeColor,
+            height: 175,
+            valueFormatter: (val) => _formatMetricVal(val, _selectedMetric),
+            unit: _selectedMetric == AnalyticsMetricType.cacheHitRate ? '%' : '',
+          ),
+
+          const SizedBox(height: HHSpacing.lg),
+
+          // Cache Efficiency Breakdown
+          CacheHitBar(
+            cache: data.cache,
+            formattedBandwidth: data.formatBandwidth(),
+          ),
+
+          if (!data.isWebAnalyticsEnabled) ...[
+            const SizedBox(height: HHSpacing.md),
+            _NoticeBanner(
+              site: widget.site,
+              hh: hh,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -265,6 +322,32 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
       setState(() {
         _selectedMetric = metric;
       });
+    }
+  }
+
+  Color _colorForMetric(AnalyticsMetricType type, HHTokens hh) {
+    switch (type) {
+      case AnalyticsMetricType.pageViews:
+        return const Color(0xFF0070F3); // Vercel Blue
+      case AnalyticsMetricType.visitors:
+        return const Color(0xFF8B5CF6); // iOS Purple
+      case AnalyticsMetricType.requests:
+        return const Color(0xFFF59E0B); // Amber Orange
+      case AnalyticsMetricType.cacheHitRate:
+        return const Color(0xFF10B981); // Emerald Green
+    }
+  }
+
+  String _metricTrendTitle(AnalyticsMetricType type) {
+    switch (type) {
+      case AnalyticsMetricType.pageViews:
+        return 'PAGE VIEWS TREND';
+      case AnalyticsMetricType.visitors:
+        return 'UNIQUE VISITORS TREND';
+      case AnalyticsMetricType.requests:
+        return 'HTTP REQUESTS TREND';
+      case AnalyticsMetricType.cacheHitRate:
+        return 'CACHE HIT RATIO';
     }
   }
 
@@ -284,6 +367,7 @@ class _MetricTile extends StatelessWidget {
     required this.value,
     required this.delta,
     required this.isSelected,
+    required this.activeColor,
     required this.hh,
     required this.onTap,
   });
@@ -292,18 +376,22 @@ class _MetricTile extends StatelessWidget {
   final String value;
   final double? delta;
   final bool isSelected;
+  final Color activeColor;
   final HHTokens hh;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final activeBg = isSelected ? hh.bgElevated2 : hh.bgBase.withValues(alpha: 0.4);
+    final activeBg = isSelected
+        ? activeColor.withValues(alpha: 0.1)
+        : hh.bgBase.withValues(alpha: 0.4);
 
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(
           horizontal: HHSpacing.sm,
           vertical: HHSpacing.sm,
@@ -312,7 +400,7 @@ class _MetricTile extends StatelessWidget {
           color: activeBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? hh.accent : hh.cardBorder.withValues(alpha: 0.5),
+            color: isSelected ? activeColor : hh.cardBorder.withValues(alpha: 0.5),
             width: isSelected ? 1.5 : 0.5,
           ),
         ),
@@ -325,8 +413,8 @@ class _MetricTile extends StatelessWidget {
                 Text(
                   type.shortName.toUpperCase(),
                   style: hh.caption2().copyWith(
-                        color: isSelected ? hh.accent : hh.textTertiary,
-                        fontWeight: FontWeight.w600,
+                        color: isSelected ? activeColor : hh.textTertiary,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                         letterSpacing: 0.4,
                       ),
                 ),

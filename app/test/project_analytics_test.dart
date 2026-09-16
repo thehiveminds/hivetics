@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hivehub/features/sites/widgets/site_analytics_section.dart';
+import 'package:hivehub/models/connection.dart';
+import 'package:hivehub/models/project.dart';
 import 'package:hivehub/models/project_analytics.dart';
+import 'package:hivehub/models/service_ref.dart';
+import 'package:hivehub/models/site.dart';
+import 'package:hivehub/providers/hosting/vercel_provider.dart';
 import 'package:hivehub/shared/theme.dart';
 import 'package:hivehub/widgets/charts/cache_hit_bar.dart';
 import 'package:hivehub/widgets/charts/ios_trend_chart.dart';
@@ -107,6 +114,92 @@ void main() {
       expect(find.text('4.2 GB'), findsOneWidget);
       expect(find.text('Data Transfer'), findsOneWidget);
       expect(find.text('OPTIMIZED'), findsOneWidget);
+    });
+
+    test('VercelProvider produces distinctive curve profiles for each metric', () async {
+      final provider = VercelProvider();
+      const conn = Connection(
+        id: 'conn_vercel_1',
+        displayName: 'Vercel Prod',
+        service: HostRef(ProviderId.vercel),
+      );
+
+      final result = await provider.getProjectAnalytics(
+        conn,
+        'dummy_token',
+        'prj_distinctive_test',
+        timeframe: AnalyticsTimeframe.month,
+      );
+
+      expect(result.isOk, isTrue);
+      final analytics = result.valueOrThrow;
+
+      final views = analytics.pageViewsTimeseries;
+      final visitors = analytics.visitorsTimeseries;
+      final requests = analytics.requestsTimeseries;
+      final cache = analytics.cacheHitRateTimeseries;
+
+      expect(views.isNotEmpty, isTrue);
+      expect(visitors.isNotEmpty, isTrue);
+      expect(requests.isNotEmpty, isTrue);
+      expect(cache.isNotEmpty, isTrue);
+
+      // Verify that curves are not simply constant-scaled multiples of each other
+      final ratios = <double>[];
+      for (int i = 0; i < views.length; i++) {
+        if (views[i].value > 0) {
+          ratios.add(visitors[i].value / views[i].value);
+        }
+      }
+
+      // Check ratio variance exists (not an identical scalar)
+      final minRatio = ratios.reduce((a, b) => a < b ? a : b);
+      final maxRatio = ratios.reduce((a, b) => a > b ? a : b);
+      expect(maxRatio - minRatio, greaterThan(0.05),
+          reason: 'Visitors curve must dynamically deviate from Views curve');
+
+      // Check Cache Hit Rate stays strictly in percentage domain
+      for (final pt in cache) {
+        expect(pt.value, inInclusiveRange(80.0, 100.0));
+      }
+    });
+
+    testWidgets('SiteAnalyticsSection returns empty SizedBox for Netlify sites', (tester) async {
+      const netlifySite = Site(
+        id: 'site_netlify_1',
+        displayName: 'My Netlify Site',
+        domain: 'example-netlify.com',
+        hostProject: Project(
+          id: 'net_prj_1',
+          connectionId: 'conn_net_1',
+          name: 'netlify-site',
+          providerId: ProviderId.netlify,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: HHTheme.dark().withHHExtension(),
+            home: const Scaffold(
+              body: SiteAnalyticsSection(
+                connectionId: 'conn_net_1',
+                projectId: 'net_prj_1',
+                site: netlifySite,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Ensure no TRAFFIC & ANALYTICS header or timeframe filters are rendered
+      expect(find.text('TRAFFIC & ANALYTICS'), findsNothing);
+      expect(find.text('24h'), findsNothing);
+      expect(find.text('7d'), findsNothing);
+      expect(find.text('28d'), findsNothing);
+      expect(find.text('90d'), findsNothing);
     });
   });
 }

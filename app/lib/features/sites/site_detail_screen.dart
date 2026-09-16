@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/connection.dart';
 import '../../models/registered_domain.dart';
 import '../../models/site.dart';
 import '../../models/deployment.dart';
@@ -109,7 +110,7 @@ class SiteDetailScreen extends ConsumerWidget {
 
                 const SizedBox(height: HHSpacing.xl),
 
-                if (project != null) ...[
+                if (project != null && project.providerId == ProviderId.vercel) ...[
                   SiteAnalyticsSection(
                     connectionId: project.connectionId,
                     projectId: project.id,

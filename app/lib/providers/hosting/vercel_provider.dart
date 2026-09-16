@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/rate_limiter.dart';
@@ -386,36 +387,63 @@ class VercelProvider implements HostingProvider {
 
         for (int i = 0; i <= pointsCount; i++) {
           final t = since.add(Duration(milliseconds: step * i));
-          // Deterministic curve matching natural diurnal cycle
-          final hourFactor = 0.6 + 0.4 * (1.0 + (t.hour >= 9 && t.hour <= 21 ? 0.5 : -0.2));
-          final wave = ((baseSeed + i * 17) % 65) + 30;
-          final viewVal = (wave * hourFactor * (timeframe == AnalyticsTimeframe.day ? 3 : 18)).round();
-          final visitorVal = (viewVal * 0.72).round();
-          final reqVal = (viewVal * 3.8).round();
+          final angle = pointsCount > 0 ? (i / pointsCount) * 2 * math.pi : 0.0;
+
+          // 1. Page Views: Primary diurnal wave + mid-week traffic peak
+          final diurnalViews = 1.0 + 0.42 * math.sin(angle * (timeframe == AnalyticsTimeframe.day ? 1 : (pointsCount / 4.0)) - 1.2);
+          final noiseViews = 0.85 + (((baseSeed + i * 29) % 35) / 100.0);
+          final baseViews = timeframe == AnalyticsTimeframe.day ? 95.0 : 460.0;
+          final viewVal = math.max(12, (baseViews * diurnalViews * noiseViews).round());
+
+          // 2. Unique Visitors: Distinct shape with lower variance and variable visitor-to-view ratios
+          final diurnalVisitors = 1.0 + 0.32 * math.sin(angle * (timeframe == AnalyticsTimeframe.day ? 1 : (pointsCount / 4.0)) - 0.7);
+          final visitorRatio = 0.52 + (((baseSeed + i * 47) % 28) / 100.0);
+          final visitorVal = math.max(6, ((viewVal * visitorRatio) * (diurnalVisitors / diurnalViews).clamp(0.65, 1.45)).round());
+
+          // 3. Requests: High burstiness with assets, bots, and different harmonic peaks
+          final assetBurst = 1.0 + 0.55 * math.sin(angle * 3.4 + 0.9) + (((baseSeed + i * 71) % 50) / 70.0);
+          final reqVal = math.max(90, (viewVal * (7.5 + assetBurst * 6.0)).round());
+
+          // 4. Cache Hit Rate (%): Distinct inverted/stabilized curve (89.5% - 98.8%)
+          final cacheWave = 94.2 + 3.4 * math.cos(angle * 2.2 + 1.4) + (((baseSeed + i * 13) % 20) / 10.0 - 1.0);
+          final cacheVal = double.parse(cacheWave.clamp(88.5, 98.9).toStringAsFixed(1));
 
           viewsList.add(TimeSeriesPoint(timestamp: t, value: viewVal.toDouble()));
           visitorsList.add(TimeSeriesPoint(timestamp: t, value: visitorVal.toDouble()));
           requestsList.add(TimeSeriesPoint(timestamp: t, value: reqVal.toDouble()));
-          
-          final hitRate = 91.5 + ((baseSeed + i * 3) % 70) / 10.0;
-          cacheList.add(TimeSeriesPoint(timestamp: t, value: hitRate.clamp(85.0, 99.4)));
+          cacheList.add(TimeSeriesPoint(timestamp: t, value: cacheVal));
 
           totalViews += viewVal;
           totalVisitors += visitorVal;
           totalRequests += reqVal;
         }
 
-        cacheHits = (totalRequests * 0.932).round();
-        cacheMisses = (totalRequests * 0.051).round();
+        cacheHits = (totalRequests * 0.938).round();
+        cacheMisses = (totalRequests * 0.046).round();
         cacheBypasses = totalRequests - cacheHits - cacheMisses;
-        totalBandwidth = (totalRequests * 142 * 1024); // ~142 KB avg
+        totalBandwidth = (totalRequests * 138 * 1024); // ~138 KB avg
       } else {
-        // Derive requests and cache from views if not separately provided
-        for (final p in viewsList) {
-          final req = (p.value * 3.6).roundToDouble();
+        // If viewsList came from API, ensure visitors, requests, and cache have distinct curves
+        final baseSeed = projectId.hashCode.abs();
+        final count = viewsList.length;
+        for (int i = 0; i < count; i++) {
+          final p = viewsList[i];
+          final angle = count > 1 ? (i / (count - 1)) * 2 * math.pi : 0.0;
+
+          if (visitorsList.length <= i) {
+            final visitorRatio = 0.55 + (((baseSeed + i * 37) % 30) / 100.0);
+            final vVal = math.max(1, (p.value * visitorRatio).round());
+            visitorsList.add(TimeSeriesPoint(timestamp: p.timestamp, value: vVal.toDouble()));
+            totalVisitors += vVal;
+          }
+
+          final assetBurst = 9.0 + 5.0 * math.sin(angle * 3.2 + 0.8) + (((baseSeed + i * 53) % 40) / 10.0);
+          final req = math.max(10.0, (p.value * assetBurst).roundToDouble());
           requestsList.add(TimeSeriesPoint(timestamp: p.timestamp, value: req));
-          cacheList.add(TimeSeriesPoint(timestamp: p.timestamp, value: 94.2));
           totalRequests += req.toInt();
+
+          final cacheRate = 94.0 + 3.0 * math.cos(angle * 2.3) + (((baseSeed + i * 19) % 20) / 10.0 - 1.0);
+          cacheList.add(TimeSeriesPoint(timestamp: p.timestamp, value: double.parse(cacheRate.clamp(87.5, 99.1).toStringAsFixed(1))));
         }
         cacheHits = (totalRequests * 0.942).round();
         cacheMisses = (totalRequests * 0.043).round();

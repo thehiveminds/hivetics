@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -57,11 +56,7 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
             children: [
               Text(
                 'TRAFFIC & ANALYTICS',
-                style: hh.caption().copyWith(
-                      color: hh.textTertiary,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
-                    ),
+                style: hh.caption2().copyWith(color: hh.textTertiary),
               ),
               // Cupertino Segmented Control (§0 in DESIGN.md)
               CupertinoSlidingSegmentedControl<AnalyticsTimeframe>(
@@ -111,7 +106,12 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
               padding: const EdgeInsets.all(HHSpacing.md),
               decoration: BoxDecoration(
                 color: hh.bgElevated,
-                borderRadius: BorderRadius.circular(HHRadius.card),
+                borderRadius: HHRadius.cardBr(),
+                border: Border.all(
+                  color: hh.cardBorder.withValues(alpha: 0.7),
+                  width: 0.5,
+                ),
+                boxShadow: hh.cardShadow,
               ),
               child: const Column(
                 children: [
@@ -160,11 +160,12 @@ class _SiteAnalyticsSectionState extends ConsumerState<SiteAnalyticsSection> {
                 padding: const EdgeInsets.all(HHSpacing.md),
                 decoration: BoxDecoration(
                   color: hh.bgElevated,
-                  borderRadius: BorderRadius.circular(HHRadius.card),
+                  borderRadius: HHRadius.cardBr(),
                   border: Border.all(
-                    color: hh.separator.withValues(alpha: 0.3),
+                    color: hh.cardBorder.withValues(alpha: 0.7),
                     width: 0.5,
                   ),
+                  boxShadow: hh.cardShadow,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,7 +297,6 @@ class _MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeBorderColor = isSelected ? hh.accent : Colors.transparent;
     final activeBg = isSelected ? hh.bgElevated2 : hh.bgBase.withValues(alpha: 0.4);
 
     return GestureDetector(
@@ -310,9 +310,9 @@ class _MetricTile extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: activeBg,
-          borderRadius: BorderRadius.circular(HHRadius.badge),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: activeBorderColor,
+            color: isSelected ? hh.accent : hh.cardBorder.withValues(alpha: 0.5),
             width: isSelected ? 1.5 : 0.5,
           ),
         ),
@@ -401,8 +401,12 @@ class _NoticeBanner extends StatelessWidget {
         vertical: HHSpacing.xs + 2,
       ),
       decoration: BoxDecoration(
-        color: hh.fill.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(HHRadius.card - 4),
+        color: hh.bgElevated2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: hh.cardBorder.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
       ),
       child: Row(
         children: [

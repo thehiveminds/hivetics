@@ -24,8 +24,12 @@ class CacheHitBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(HHSpacing.md),
       decoration: BoxDecoration(
-        color: hh.bgElevated,
-        borderRadius: BorderRadius.circular(HHRadius.card),
+        color: hh.bgElevated2,
+        borderRadius: HHRadius.cardBr(),
+        border: Border.all(
+          color: hh.cardBorder.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

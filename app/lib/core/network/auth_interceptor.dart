@@ -3,14 +3,27 @@
 import 'package:dio/dio.dart';
 import '../../models/credential.dart';
 
+/// Header set for a credential. Both shapes are plain headers — never a
+/// query param, never a POST body field (Porkbun's old auth style).
+Map<String, String> credentialHeaders(Credential credential) => switch (credential) {
+      BearerCredential(:final token) => {'Authorization': 'Bearer $token'},
+      KeyPairCredential(:final apiKey, :final secretKey) => {
+          'X-API-Key': apiKey,
+          'X-Secret-API-Key': secretKey,
+        },
+      OAuthCredential(:final accessToken) => {
+          'Authorization': 'Bearer $accessToken',
+        },
+    };
+
 class AuthInterceptor extends Interceptor {
   const AuthInterceptor({required this.credential});
 
-  final BearerCredential credential;
+  final Credential credential;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    options.headers['Authorization'] = 'Bearer ${credential.token}';
+    options.headers.addAll(credentialHeaders(credential));
     options.extra['_redactedAuth'] = true;
     handler.next(options);
   }
@@ -22,7 +35,13 @@ class RedactingLogInterceptor extends Interceptor {
     assert(() {
       final headers = Map<String, dynamic>.from(options.headers);
       if (options.extra['_redactedAuth'] == true) {
-        headers['Authorization'] = '[REDACTED]';
+        for (final key in const [
+          'Authorization',
+          'X-API-Key',
+          'X-Secret-API-Key',
+        ]) {
+          if (headers.containsKey(key)) headers[key] = '[REDACTED]';
+        }
       }
       // ignore: avoid_print
       print('→ ${options.method} ${options.uri}  headers: $headers');

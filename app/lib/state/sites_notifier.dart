@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
 import '../core/storage/secure_store.dart';
 import '../models/connection.dart';
+import '../models/credential.dart';
 import '../models/deploy_status.dart';
 import '../models/service_ref.dart';
 import '../models/site.dart';
@@ -74,8 +75,8 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
       return ConnectionFetchResult(connection: c);
     }
 
-    final token = await SecureStore.instance.loadCredential(c.id);
-    if (token == null) {
+    final credential = await SecureStore.instance.loadCredential(c.id);
+    if (credential is! BearerCredential) {
       return ConnectionFetchResult(
         connection: c,
         error: const UnauthorizedException('No token found — reconnect'),
@@ -83,7 +84,7 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
     }
 
     final provider = providerFor(host.provider);
-    final projectsResult = await provider.listProjects(c, token.token);
+    final projectsResult = await provider.listProjects(c, credential.token);
 
     return projectsResult.when(
       ok: (projects) {

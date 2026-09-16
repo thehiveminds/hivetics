@@ -10,7 +10,7 @@ const String _appVersion = '0.1.0';
 
 Dio buildClient({
   required String baseUrl,
-  required BearerCredential credential,
+  required Credential credential,
   required ProviderRateLimit rateLimit,
   Map<String, String> extraHeaders = const {},
 }) {

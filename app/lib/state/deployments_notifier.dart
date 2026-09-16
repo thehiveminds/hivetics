@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/storage/secure_store.dart';
+import '../models/credential.dart';
 import '../models/deployment.dart';
 import '../models/connection.dart';
 import '../models/service_ref.dart';
@@ -26,19 +27,19 @@ class DeploymentsNotifier extends AsyncNotifier<List<Deployment>> {
       final host = c.service;
       if (host is! HostRef) return;
 
-      final token = await SecureStore.instance.loadCredential(c.id);
-      if (token == null) return;
+      final credential = await SecureStore.instance.loadCredential(c.id);
+      if (credential is! BearerCredential) return;
 
       final provider = providerFor(host.provider);
 
       // List all projects first to get project IDs.
-      final projectsResult = await provider.listProjects(c, token.token);
+      final projectsResult = await provider.listProjects(c, credential.token);
       final projects = projectsResult.valueOrThrow; // silently skipped on error
 
       await Future.wait(projects.take(10).map((project) async {
         final deployResult = await provider.listDeployments(
           c,
-          token.token,
+          credential.token,
           project.id,
           limit: 10,
         );
@@ -68,12 +69,12 @@ final projectDeploymentsProvider = FutureProvider.family<List<Deployment>, ({Str
     final connection = connections.firstWhere((c) => c.id == args.connectionId);
     final host = connection.service;
     if (host is! HostRef) return [];
-    final token = await SecureStore.instance.loadCredential(connection.id);
-    if (token == null) return [];
+    final credential = await SecureStore.instance.loadCredential(connection.id);
+    if (credential is! BearerCredential) return [];
     final provider = providerFor(host.provider);
     final result = await provider.listDeployments(
       connection,
-      token.token,
+      credential.token,
       args.projectId,
       limit: 20,
     );

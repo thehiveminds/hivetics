@@ -2,6 +2,7 @@
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../models/credential.dart';
+import 'credential_codec.dart';
 
 class SecureStore {
   SecureStore._();
@@ -13,14 +14,24 @@ class SecureStore {
 
   static String _tokenKey(String connectionId) => 'token_$connectionId';
 
-  Future<void> saveToken(String connectionId, String token) async {
-    await _storage.write(key: _tokenKey(connectionId), value: token);
+  Future<void> saveToken(String connectionId, String token) =>
+      saveCredential(connectionId, BearerCredential(token: token));
+
+  Future<void> saveCredential(String connectionId, Credential credential) async {
+    await _storage.write(
+      key: _tokenKey(connectionId),
+      value: encodeCredential(credential),
+    );
   }
 
-  Future<BearerCredential?> loadCredential(String connectionId) async {
-    final token = await _storage.read(key: _tokenKey(connectionId));
-    if (token == null) return null;
-    return BearerCredential(token: token);
+  Future<Credential?> loadCredential(String connectionId) async {
+    final raw = await _storage.read(key: _tokenKey(connectionId));
+    if (raw == null) return null;
+    final decoded = decodeCredential(raw);
+    if (decoded.migrated) {
+      await saveCredential(connectionId, decoded.credential);
+    }
+    return decoded.credential;
   }
 
   Future<void> deleteCredential(String connectionId) async {

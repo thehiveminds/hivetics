@@ -1,13 +1,19 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
+import '../core/storage/db.dart';
 import '../core/storage/secure_store.dart';
 import '../models/connection.dart';
 import '../models/credential.dart';
 import '../models/deploy_status.dart';
+import '../models/registered_domain.dart';
+import '../models/registrar_id.dart';
 import '../models/service_ref.dart';
 import '../models/site.dart';
 import '../models/site_alert.dart';
 import '../providers/provider_registry.dart';
+import '../providers/registrar/registrar_status_normalizer.dart';
+import '../shared/domain_utils.dart';
 import 'connections_notifier.dart';
 
 /// Per-connection fetch result — error is not global.
@@ -61,17 +67,26 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
   }
 
   Future<SitesState> _fetchAll(List<Connection> connections) async {
+    final db = ref.read(dbProvider);
+
+    // Read cached registrar domains from Drift DB (Sites refresh stays hosting-only per §6.3)
+    final cachedRegistrarRows = await db.allRegisteredDomains();
+    final registrarDomains = cachedRegistrarRows.map(_rowToDomain).toList();
+
     final results = await Future.wait(
-      connections.map((c) => _fetchConnection(c)),
+      connections.map((c) => _fetchConnection(c, registrarDomains)),
     );
     return SitesState(results: results);
   }
 
-  Future<ConnectionFetchResult> _fetchConnection(Connection c) async {
+  Future<ConnectionFetchResult> _fetchConnection(
+    Connection c,
+    List<RegisteredDomain> registrarDomains,
+  ) async {
     final host = c.service;
     if (host is! HostRef) {
-      // Registrar-only connections never yield Sites; the merge engine
-      // (§6) joins their domains onto Sites instead.
+      // Registrar-only connections never yield Sites (§6.1);
+      // their domains are joined onto Sites or live in the Domains tab.
       return ConnectionFetchResult(connection: c);
     }
 
@@ -89,11 +104,27 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
     return projectsResult.when(
       ok: (projects) {
         final sites = projects.map((project) {
-          // Phase 1: no embedded latest deployment in this path.
-          // The projects list response already has latestDeployments[0] for Vercel.
-          // For Phase 1 we leave latestDeployment null and rely on listDeployments on detail.
           final domain = project.primaryDomain;
           final siteId = domain ?? 'host:${project.id}';
+
+          // Join with registrar domain on normalizeDomain (§6.1)
+          RegisteredDomain? matchedDomain;
+          if (domain != null && domain.isNotEmpty) {
+            final normalized = normalizeDomain(domain);
+            final matches = registrarDomains
+                .where((rd) => rd.domain == normalized)
+                .toList();
+
+            if (matches.isNotEmpty) {
+              // Same domain at two registrars: pick the one with later expiresAt (§6.1)
+              matches.sort((a, b) {
+                final aExp = a.expiresAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                final bExp = b.expiresAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                return bExp.compareTo(aExp);
+              });
+              matchedDomain = matches.first;
+            }
+          }
 
           final alerts = <SiteAlert>[];
           if (c.isUnauthorized) {
@@ -102,12 +133,18 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
             alerts.add(SiteAlert.buildFailed);
           }
 
+          // Domain alerts (§6.2)
+          if (matchedDomain != null) {
+            alerts.addAll(computeDomainAlerts(domain: matchedDomain));
+          }
+
           return Site(
             id: siteId,
             displayName: domain ?? project.name,
             domain: domain,
             hostProject: project,
             latestDeployment: project.latestDeployment,
+            registration: matchedDomain,
             alerts: alerts,
           );
         }).toList();
@@ -115,12 +152,40 @@ class SitesNotifier extends AsyncNotifier<SitesState> {
         return ConnectionFetchResult(connection: c, sites: sites);
       },
       err: (e) {
-        // Record the error in drift for display in the connection list.
-        ref
-            .read(connectionsProvider.notifier)
-            .setError(c.id, e.runtimeType.toString());
         return ConnectionFetchResult(connection: c, error: e);
       },
+    );
+  }
+
+  static RegisteredDomain _rowToDomain(RegisteredDomainRow row) {
+    List<String> ns = const [];
+    try {
+      final decoded = jsonDecode(row.nameServers);
+      if (decoded is List) {
+        ns = decoded.map((e) => e.toString()).toList();
+      }
+    } catch (_) {}
+
+    final registrar = RegistrarId.fromId(row.registrarId);
+    final status = switch (registrar) {
+      RegistrarId.godaddy => normalizeGoDaddyStatus(row.rawStatus),
+      RegistrarId.porkbun => normalizePorkbunStatus(row.rawStatus),
+      RegistrarId.cloudflareregistrar =>
+        normalizeCloudflareRegistrarStatus(row.rawStatus),
+    };
+
+    return RegisteredDomain(
+      domain: row.domain,
+      connectionId: row.connectionId,
+      registrar: registrar,
+      status: status,
+      rawStatus: row.rawStatus,
+      expiresAt: row.expiresAt,
+      autoRenew: row.autoRenew,
+      locked: row.locked,
+      privacy: row.privacy,
+      nameServers: ns,
+      fetchedAt: row.fetchedAt,
     );
   }
 }
@@ -134,3 +199,4 @@ extension _SitesStateExt on SitesState {
 
 final sitesProvider =
     AsyncNotifierProvider<SitesNotifier, SitesState>(SitesNotifier.new);
+

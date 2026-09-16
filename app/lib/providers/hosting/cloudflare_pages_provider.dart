@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/rate_limiter.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/retry_interceptor.dart';
 import '../../core/result.dart';
@@ -23,6 +24,7 @@ class CloudflarePagesProvider implements HostingProvider {
   Dio _client(String token) => buildClient(
         baseUrl: _base,
         credential: BearerCredential(token: token),
+        rateLimit: ProviderRateLimit.cloudflare,
       );
 
   @override
@@ -32,13 +34,25 @@ class CloudflarePagesProvider implements HostingProvider {
   }) async {
     final dio = _client(token);
     try {
-      // Using /accounts is safer than /user/tokens/verify for minimal-scope tokens.
+      // Establish that the token itself is good BEFORE reading /accounts.
+      // /accounts answers 200 with an EMPTY result for a token that lacks the
+      // "Account Settings: Read" permission, so an empty list on its own cannot
+      // distinguish "bad token" from "valid token, missing one permission".
+      final verifyRes =
+          await dio.get<Map<String, dynamic>>('/user/tokens/verify');
+      _checkCfSuccess(verifyRes.data);
+
       final res = await dio.get<Map<String, dynamic>>('/accounts');
       _checkCfSuccess(res.data);
       final accounts = (res.data!['result'] as List?) ?? [];
 
       if (accounts.isEmpty) {
-        return const Err(ForbiddenException('No Cloudflare accounts found for this token'));
+        // Token verified, but it cannot enumerate accounts.
+        return const Err(ForbiddenException(
+          'Token is valid but cannot list accounts. Add the '
+          '"Account Settings: Read" permission to it (alongside '
+          '"Cloudflare Pages: Read"), then reconnect.',
+        ));
       }
 
       // Single account — auto-select.
@@ -99,7 +113,10 @@ class CloudflarePagesProvider implements HostingProvider {
         }
 
         final name = m['name'] as String? ?? '';
-        final projectId = m['id'] as String? ?? name;
+        // The Pages API addresses projects by NAME, not by the UUID in `id`
+        // (/accounts/{account_id}/pages/projects/{project_name}/deployments).
+        // Names are unique per account, so the name is the usable identifier.
+        final projectId = name.isNotEmpty ? name : (m['id'] as String? ?? '');
 
         Deployment? latestDeploy;
         final ld = m['latest_deployment'];
@@ -228,7 +245,10 @@ class CloudflarePagesProvider implements HostingProvider {
     if (success == true) return;
     final errors = (data['errors'] as List?)
         ?.map((e) => (e as Map)['message'] as String? ?? '')
+        .where((m) => m.isNotEmpty)
         .join('; ');
-    throw UnknownException(errors ?? 'Cloudflare API error');
+    throw UnknownException(
+      (errors == null || errors.isEmpty) ? 'Cloudflare API error' : errors,
+    );
   }
 }

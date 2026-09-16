@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/connection.dart';
 import '../../providers/hosting/hosting_provider.dart';
@@ -317,7 +317,7 @@ class _ProviderPicker extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Select a hosting platform to link with HiveHub.',
+          'Select a hosting platform to link with Hivetics.',
           style: hh.body().copyWith(color: hh.textSecondary),
         ),
         const SizedBox(height: HHSpacing.lg),
@@ -349,9 +349,10 @@ class _ProviderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = switch (provider) {
-      ProviderId.vercel => 'Next.js, frontend & serverless deployments',
-      ProviderId.netlify => 'Web apps, edge functions & custom domains',
-      ProviderId.cloudflarepages => 'Edge hosting & unlimited preview branches',
+      // Kept to a similar length so the three cards read as one set.
+      ProviderId.vercel => 'Frontend & serverless deploys',
+      ProviderId.netlify => 'Web apps & custom domains',
+      ProviderId.cloudflarepages => 'Edge hosting & preview branches',
     };
 
     return AppPressable(
@@ -377,15 +378,21 @@ class _ProviderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Both lines are pinned to a single line so every card is
+                  // exactly the same height. "Cloudflare Pages" is long enough
+                  // to wrap on narrow screens, which made that one card taller
+                  // than the other two.
                   Text(
                     provider.displayName,
                     style: hh.headline().copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
                     style: hh.footnote().copyWith(color: hh.textSecondary),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -438,7 +445,7 @@ class _TokenEntry extends StatelessWidget {
         ),
         const SizedBox(height: HHSpacing.sm),
         Text(
-          'HiveHub encrypts and stores your token locally using Android Keystore / iOS Keychain.',
+          'Hivetics encrypts and stores your token locally using the Android Keystore. It never leaves your device.',
           style: hh.footnote().copyWith(color: hh.textSecondary),
         ),
         const SizedBox(height: HHSpacing.lg),

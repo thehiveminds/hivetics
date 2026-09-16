@@ -1,5 +1,5 @@
 name: hivehub
-description: One screen for every site you run — Hive Hub by TheHiveMinds
+description: One dashboard for all your deployments, sites, and hosting providers — Hivetics by TheHiveMinds
 publish_to: "none"
 version: 0.1.0+1
 
@@ -30,7 +30,7 @@ dependencies:
 
   # UI
   google_fonts: ^6.2.0
-  lucide_icons: ^0.257.0
+  lucide_icons_flutter: ^3.1.20
   flutter_svg: ^2.0.0
   url_launcher: ^6.2.0
 
@@ -70,3 +70,4 @@ flutter:
 
   assets:
     - assets/icons/
+    - assets/logo.png

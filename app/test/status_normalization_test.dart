@@ -1,4 +1,4 @@
-// MIT Licence — TheHiveMinds / Hive Hub
+// MIT Licence — TheHiveMinds / Hivetics
 // Status normalization unit tests — MANDATORY per ARCHITECTURE §10.
 // Test every mapping including the unknown fallback. Getting this wrong
 // shows a broken production build as "live" or shows "failed" for an unknown state.
@@ -18,7 +18,7 @@ void main() {
     test('INITIALIZING → queued', () => expect(normalizeVercelStatus('INITIALIZING'), DeployStatus.queued));
     test('ERROR → failed', () => expect(normalizeVercelStatus('ERROR'), DeployStatus.failed));
     test('CANCELED → cancelled', () => expect(normalizeVercelStatus('CANCELED'), DeployStatus.cancelled));
-    test('BLOCKED → cancelled', () => expect(normalizeVercelStatus('BLOCKED'), DeployStatus.cancelled));
+    test('BLOCKED → failed (needs attention: spend cap / deployment protection)', () => expect(normalizeVercelStatus('BLOCKED'), DeployStatus.failed));
     test('DELETED → cancelled', () => expect(normalizeVercelStatus('DELETED'), DeployStatus.cancelled));
     test('lowercase ready → ready (case-insensitive)', () => expect(normalizeVercelStatus('ready'), DeployStatus.ready));
     test('null → unknown', () => expect(normalizeVercelStatus(null), DeployStatus.unknown));

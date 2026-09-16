@@ -3,7 +3,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/connection.dart';
 import '../../models/deploy_status.dart';
@@ -63,7 +63,7 @@ class SettingsScreen extends ConsumerWidget {
                 header: 'Subscription',
                 children: [
                   AppListRow(
-                    title: 'Hive Hub Pro',
+                    title: 'Hivetics Pro',
                     subtitle: 'Coming in a future update',
                     leadingIcon: LucideIcons.zap,
                     leadingIconColor: hh.accent,
@@ -96,10 +96,10 @@ class SettingsScreen extends ConsumerWidget {
                   const AppListRow(title: 'Version', trailingValue: '0.1.0'),
                   AppListRow(
                     title: 'GitHub',
-                    leadingIcon: LucideIcons.github,
+                    leadingIcon: LucideIcons.code,
                     showChevron: true,
                     onTap: () => launchUrl(
-                      Uri.parse('https://github.com/thehiveminds/hive-hub'),
+                      Uri.parse('https://github.com/thehiveminds/hivetics'),
                       mode: LaunchMode.externalApplication,
                     ),
                   ),

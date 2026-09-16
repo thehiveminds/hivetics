@@ -8,8 +8,11 @@ DeployStatus normalizeVercelStatus(String? raw) {
     'READY'                          => DeployStatus.ready,
     'BUILDING'                       => DeployStatus.building,
     'QUEUED' || 'INITIALIZING'       => DeployStatus.queued,
-    'ERROR'                          => DeployStatus.failed,
-    'CANCELED' || 'BLOCKED' || 'DELETED' => DeployStatus.cancelled,
+    // BLOCKED means Vercel refused to serve the deploy (spend cap, deployment
+    // protection). That needs attention, so it is an alert — not a quiet grey
+    // "cancelled".
+    'ERROR' || 'BLOCKED'             => DeployStatus.failed,
+    'CANCELED' || 'DELETED'          => DeployStatus.cancelled,
     _                                => DeployStatus.unknown,
   };
 }

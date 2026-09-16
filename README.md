@@ -1,4 +1,4 @@
-# Hivetics (Hive Hub) 🚀
+# Hivetics 🚀
 
 > **One dashboard for all your deployments, sites, and hosting providers.**  
 > Effortlessly monitor **Vercel**, **Netlify**, and **Cloudflare Pages** from your phone or desktop with real-time status tracking, alert detection, and secure local token storage.
@@ -15,7 +15,7 @@
 - **Sites & Domain Management**: Clean, consolidated view of all active sites and custom domains, with instant status pills and health indicators.
 - **Smart Alert Engine**: Automatic notification and prioritization of broken builds, failing deployments, or expired credentials.
 - **Security-First Architecture**: 
-  - Tokens are stored **exclusively** on your local device using **Android Keystore** and **Apple Keychain** via `flutter_secure_storage`.
+  - Tokens are stored **exclusively** on your local device using the **Android Keystore** via `flutter_secure_storage`.
   - Zero analytics tracking of sensitive keys, zero remote relays — direct, encrypted client-to-API communication.
 - **Sleek, Modern Design**:
   - Frosted-glass backdrop blur (`BackdropFilter`) with dark & light theme modes.
@@ -30,7 +30,7 @@
 - **State Management**: [Riverpod 2](https://riverpod.dev) (`flutter_riverpod`, `AsyncNotifier`)
 - **Local Database**: [Drift](https://drift.simonbinder.eu) (type-safe SQLite ORM)
 - **Secure Storage**: [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage) (Hardware-backed Keystore/Keychain)
-- **HTTP Client**: [Dio](https://pub.dev/packages/dio) with retry and rate-limiting interceptors
+- **HTTP Client**: [Dio](https://pub.dev/packages/dio) with retry, per-provider rate-limiting, and credential-redacting interceptors
 - **Icons & Typography**: [Google Fonts (Manrope)](https://fonts.google.com/specimen/Manrope) & [Lucide Icons](https://lucide.dev)
 
 ---
@@ -40,7 +40,7 @@
 ### Prerequisites
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.24+ recommended)
-- Android Studio / Xcode (for device emulators and toolchains)
+- Android Studio + Android SDK (Android is the only platform target today — there is no `ios/` directory yet)
 
 ### Installation
 
@@ -76,13 +76,14 @@
 
 Hivetics is designed from the ground up to keep your infrastructure credentials safe:
 - **No intermediary backend**: All API calls go directly from your device to provider endpoints (`api.vercel.com`, `api.netlify.com`, `api.cloudflare.com`).
-- **Encrypted credentials**: Keys are saved to platform secure enclaves using AES-256 GCM encryption.
-- **Cleartext traffic disabled**: Enforced `usesCleartextTraffic=false` on Android and App Transport Security on iOS.
+- **Encrypted credentials**: Keys are saved to the Android Keystore via `flutter_secure_storage` (`encryptedSharedPreferences`).
+- **Cleartext traffic disabled**: Enforced `usesCleartextTraffic=false` in the Android manifest.
+- **Redacted logs**: `Authorization` headers are replaced with `[REDACTED]` in debug logging, which is itself stripped from release builds.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 Developed with ❤️ by [TheHiveMinds](https://github.com/thehiveminds).

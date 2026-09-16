@@ -17,7 +17,7 @@ class HiveHubApp extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
 
     return MaterialApp(
-      title: 'Hive Hub',
+      title: 'Hivetics',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: HHTheme.light().withHHExtension(),

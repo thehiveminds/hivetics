@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/connection.dart';
 import '../../models/site.dart';
@@ -136,7 +136,7 @@ class _SitesScreenState extends ConsumerState<SitesScreen> {
             ),
             const SizedBox(height: HHSpacing.sm),
             Text(
-              'Hive Hub joins your deploy status, domain expiry, and traffic in one view.',
+              'Hivetics joins your deploy status, domain expiry, and traffic in one view.',
               style: hh.body().copyWith(color: hh.textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -326,6 +326,12 @@ class _SearchBar extends StatelessWidget implements PreferredSizeWidget {
                         fontSize: 14,
                         color: hh.textTertiary,
                       ),
+                  // The global inputDecorationTheme is `filled: true` with its
+                  // own colour and corner radius. Left on, the field painted a
+                  // second, differently-rounded rectangle inside this
+                  // container. The container is the visible background here.
+                  filled: false,
+                  fillColor: Colors.transparent,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,

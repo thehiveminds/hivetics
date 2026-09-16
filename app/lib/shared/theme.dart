@@ -1,4 +1,4 @@
-// MIT Licence — TheHiveMinds / Hive Hub
+// MIT Licence — TheHiveMinds / Hivetics
 // ─────────────────────────────────────────────────────────────────────────────
 // shared/theme.dart — SINGLE SOURCE OF TRUTH for every design token.
 //
@@ -14,6 +14,7 @@
 //   • Colour is NEVER the only signal (enforced in component specs, not here).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';

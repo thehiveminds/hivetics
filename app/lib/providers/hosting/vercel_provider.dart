@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/rate_limiter.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/retry_interceptor.dart';
 import '../../core/result.dart';
@@ -22,6 +23,7 @@ class VercelProvider implements HostingProvider {
   Dio _client(String token) => buildClient(
         baseUrl: _base,
         credential: BearerCredential(token: token),
+        rateLimit: ProviderRateLimit.vercel,
       );
 
   @override

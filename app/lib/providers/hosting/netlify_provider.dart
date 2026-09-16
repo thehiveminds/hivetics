@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/rate_limiter.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/retry_interceptor.dart';
 import '../../core/result.dart';
@@ -23,7 +24,8 @@ class NetlifyProvider implements HostingProvider {
   Dio _client(String token) => buildClient(
         baseUrl: _base,
         credential: BearerCredential(token: token),
-        extraHeaders: {'User-Agent': 'HiveHub/$_version'},
+        rateLimit: ProviderRateLimit.netlify,
+        extraHeaders: {'User-Agent': 'Hivetics/$_version'},
       );
 
   @override
@@ -77,7 +79,8 @@ class NetlifyProvider implements HostingProvider {
           connectionId: c.id,
           providerId: ProviderId.netlify,
           name: m['name'] as String? ?? siteId,
-          framework: (m['build_settings'] as Map?)?['framework'] as String?,
+          // `framework` lives on the deploy object, not on build_settings.
+          framework: (pub is Map ? pub['framework'] : null) as String?,
           productionBranch: (m['build_settings'] as Map?)?['repo_branch'] as String?,
           domains: domains,
           latestDeployment: latestDeploy,
@@ -139,11 +142,18 @@ class NetlifyProvider implements HostingProvider {
     final publishedAt = parseIso8601Timestamp(m['published_at']);
     final updatedAt = parseIso8601Timestamp(m['updated_at']);
 
+    // `deploy_time` is the real build duration in seconds. Falling back to
+    // (published_at − created_at) overstates it by the queue wait.
     Duration? duration;
-    final candidate = publishedAt ?? updatedAt;
-    if (candidate != null) {
-      final diff = candidate.difference(createdAt);
-      if (!diff.isNegative) duration = diff;
+    final deployTime = m['deploy_time'];
+    if (deployTime is num && deployTime > 0) {
+      duration = Duration(seconds: deployTime.round());
+    } else {
+      final candidate = publishedAt ?? updatedAt;
+      if (candidate != null) {
+        final diff = candidate.difference(createdAt);
+        if (!diff.isNegative) duration = diff;
+      }
     }
 
     // ssl_url is the canonical URL for Netlify (full, with scheme).
@@ -159,9 +169,11 @@ class NetlifyProvider implements HostingProvider {
       environment: m['context'] as String?, // 'production' | 'deploy-preview' | 'branch-deploy'
       duration: duration,
       errorMessage: m['error_message'] as String?,
-      commitMessage: m['title'] as String?, // commit message in practice
+      // `commit_message` is the real field; `title` is a display fallback that
+      // is also set for manual (non-git) deploys.
+      commitMessage: (m['commit_message'] ?? m['title']) as String?,
       commitSha: m['commit_ref'] as String?,
-      commitAuthor: null, // Netlify does not expose author name in this endpoint
+      commitAuthor: m['committer'] as String?,
       createdAt: createdAt,
     );
   }

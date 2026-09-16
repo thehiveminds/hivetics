@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 
 
 import 'dart:async';
@@ -95,6 +96,45 @@ class _TokenBucket {
     if (now - _lastRefill >= refillWindowMs) {
       _tokens = maxTokens;
       _lastRefill = now;
+    }
+  }
+}
+
+/// Dio interceptor that routes every request through [RateLimiter] for its
+/// provider, and always releases the global concurrency slot — on success,
+/// on error, and on a cancelled request alike.
+class RateLimitInterceptor extends Interceptor {
+  RateLimitInterceptor({required this.policy});
+
+  final ProviderRateLimit policy;
+
+  static const _slotHeldKey = '_rateLimitSlotHeld';
+
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    await RateLimiter.instance.acquire(policy);
+    options.extra[_slotHeldKey] = true;
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    _release(response.requestOptions);
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    _release(err.requestOptions);
+    handler.next(err);
+  }
+
+  void _release(RequestOptions options) {
+    if (options.extra.remove(_slotHeldKey) == true) {
+      RateLimiter.instance.release();
     }
   }
 }

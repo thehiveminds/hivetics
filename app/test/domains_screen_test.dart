@@ -67,7 +67,7 @@ void main() {
   }
 
   group('DomainsScreen', () {
-    testWidgets('renders domain list and pinned EXPIRING SOON section',
+    testWidgets('renders domain list with cards and alerts',
         (tester) async {
       final state = DomainsState(
         results: [
@@ -83,7 +83,6 @@ void main() {
 
       // Verified screen elements
       expect(find.text('Domains'), findsWidgets);
-      expect(find.text('EXPIRING SOON'), findsOneWidget);
       expect(find.text('expiring-soon.org'), findsWidgets);
       expect(find.text('active-domain.com'), findsOneWidget);
       expect(find.text('Expires in 12 days'), findsWidgets);
@@ -103,8 +102,8 @@ void main() {
       await tester.pumpWidget(createSubject(state));
       await tester.pumpAndSettle();
 
-      // Tap 'Expiring' chip
-      await tester.tap(find.text('Expiring'));
+      // Tap 'Needs attention' chip
+      await tester.tap(find.text('Needs attention'));
       await tester.pumpAndSettle();
 
       // active-domain.com is not expiring soon so it should be filtered out

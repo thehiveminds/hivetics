@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/registered_domain.dart';
+import '../shared/formatters.dart';
 import '../shared/theme.dart';
 import 'app_pressable.dart';
 import 'domain_status_pill.dart';
@@ -24,7 +25,7 @@ class DomainCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hh = context.hh;
-    final days = domain.daysUntilExpiry;
+    final status = _effectiveStatus(domain);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: HHSpacing.screenPadding),
@@ -46,6 +47,7 @@ class DomainCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Row 1: Domain Name + Status Pill
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -58,22 +60,32 @@ class DomainCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: HHSpacing.sm),
-                  DomainStatusPill(status: domain.status),
+                  DomainStatusPill(status: status),
                 ],
               ),
 
               const SizedBox(height: HHSpacing.xs),
 
+              // Row 2: Registrar Icon + Registrar Name + Expiration Date + Auto-Renew + Lock
               Row(
                 children: [
                   RegistrarBadge(registrarId: domain.registrar),
                   const SizedBox(width: HHSpacing.xs),
                   Text(
-                    _formatExpiry(domain, days),
+                    domain.registrar.displayName,
                     style: hh.footnote(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (domain.expiresAt != null) ...[
+                    Text(' · ', style: hh.footnote()),
+                    Text(
+                      formatDate(domain.expiresAt!),
+                      style: hh.footnote(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   if (domain.autoRenew != null) ...[
                     Text(' · ', style: hh.footnote()),
                     Text(
@@ -98,6 +110,7 @@ class DomainCard extends StatelessWidget {
                 ],
               ),
 
+              // Row 3: Alert Row (matching SiteCard's _AlertRow)
               if (_hasAlerts(domain)) ...[
                 const SizedBox(height: HHSpacing.sm),
                 _DomainAlertRow(domain: domain, hh: hh),
@@ -109,16 +122,14 @@ class DomainCard extends StatelessWidget {
     );
   }
 
+  static DomainStatus _effectiveStatus(RegisteredDomain d) {
+    if (d.isExpired) return DomainStatus.expired;
+    if (d.isExpiringSoon) return DomainStatus.expiring;
+    return d.status;
+  }
+
   static bool _hasAlerts(RegisteredDomain d) =>
       d.isExpired || d.isExpiringSoon || d.autoRenew == false;
-
-  static String _formatExpiry(RegisteredDomain domain, int? days) {
-    if (domain.isExpired) return 'Expired';
-    if (days == null) return 'Active';
-    if (days == 0) return 'Expires today';
-    if (days == 1) return 'Expires tomorrow';
-    return 'Expires in $days days';
-  }
 }
 
 class _DomainAlertRow extends StatelessWidget {

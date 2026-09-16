@@ -86,105 +86,35 @@ class _DomainsScreenState extends ConsumerState<DomainsScreen> {
 
   Widget _buildContent(DomainsState state, HHTokens hh) {
     final allDomains = state.allDomains;
+    final filtered = _applyFilters(allDomains);
+
     if (allDomains.isEmpty) {
       return _buildEmpty(state, hh);
     }
 
-    final filtered = _applyFilters(allDomains);
-    if (filtered.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Text(
-            'No matching domains',
-            style: hh.body().copyWith(color: hh.textSecondary),
-          ),
-        ),
-      );
-    }
-
-    final expiring = state.expiringSoonDomains;
-    final filteredExpiring = _applyFilters(expiring);
-    final showPinnedExpiring = !_filterNeedsAttention &&
-        _filterRegistrar == null &&
-        filteredExpiring.isNotEmpty;
-
-    // Remaining domains that are not already listed in expiring section
-    final otherDomains = showPinnedExpiring
-        ? filtered.where((d) => !filteredExpiring.contains(d)).toList()
-        : filtered;
-
     return SliverList(
       delegate: SliverChildListDelegate([
-        const SizedBox(height: HHSpacing.sm),
+        // Per-connection error rows (matching SitesScreen)
+        ...state.results
+            .where((r) => r.hasError)
+            .map(
+              (r) => _ConnectionErrorCard(
+                result: r,
+                hh: hh,
+                onRetry: () => ref.read(domainsProvider.notifier).refresh(),
+              ),
+            ),
 
-        // Pinned "EXPIRING SOON" section
-        if (showPinnedExpiring) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              HHSpacing.screenPadding,
-              HHSpacing.xs,
-              HHSpacing.screenPadding,
-              HHSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  LucideIcons.alertTriangle,
-                  size: 14,
-                  color: hh.statusQueued,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'EXPIRING SOON',
-                  style: hh.caption().copyWith(
-                        color: hh.statusQueued,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          ...filteredExpiring.map(
-            (d) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: DomainCard(
-                domain: d,
-                onTap: () => _openDomainDetail(d),
-                onLongPress: () => _showQuickActions(d),
-              ),
-            ),
-          ),
-          if (otherDomains.isNotEmpty) ...[
-            const SizedBox(height: HHSpacing.sm),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                HHSpacing.screenPadding,
-                HHSpacing.xs,
-                HHSpacing.screenPadding,
-                HHSpacing.sm,
-              ),
-              child: Text(
-                'ALL DOMAINS',
-                style: hh.caption().copyWith(
-                      color: hh.textTertiary,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ),
-              ),
-            ),
-          ],
-        ],
+        const SizedBox(height: HHSpacing.md),
 
-        // Main domain list
-        ...otherDomains.map(
-          (d) => Padding(
+        // Domain cards (matching SitesScreen)
+        ...filtered.map(
+          (domain) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DomainCard(
-              domain: d,
-              onTap: () => _openDomainDetail(d),
-              onLongPress: () => _showQuickActions(d),
+              domain: domain,
+              onTap: () => _openDomainDetail(domain),
+              onLongPress: () => _showQuickActions(domain),
             ),
           ),
         ),
@@ -217,7 +147,7 @@ class _DomainsScreenState extends ConsumerState<DomainsScreen> {
             Text(
               hasPorkbun
                   ? 'Porkbun requires API access to be enabled per domain in your Porkbun dashboard. Domains without it won\'t appear here.'
-                  : 'Connect GoDaddy, Porkbun, or Cloudflare to monitor domain expiry and DNS records.',
+                  : 'Connect a registrar like GoDaddy, Porkbun, or Cloudflare to monitor domain expiry and DNS records.',
               style: hh.body().copyWith(color: hh.textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -463,7 +393,7 @@ class _FilterChips extends StatelessWidget {
           if (hasAlerts) ...[
             const SizedBox(width: HHSpacing.sm),
             _Chip(
-              label: 'Expiring',
+              label: 'Needs attention',
               selected: needsAttention,
               onTap: onAttentionFilter,
               hh: hh,
@@ -525,6 +455,53 @@ class _Chip extends StatelessWidget {
                 color: selected ? const Color(0xFF000000) : hh.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectionErrorCard extends StatelessWidget {
+  const _ConnectionErrorCard({
+    required this.result,
+    required this.hh,
+    required this.onRetry,
+  });
+  final ConnectionDomainsResult result;
+  final HHTokens hh;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        HHSpacing.screenPadding,
+        0,
+        HHSpacing.screenPadding,
+        HHSpacing.sm,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(HHSpacing.md),
+        decoration: BoxDecoration(
+          color: hh.statusQueued.withValues(alpha: 0.10),
+          borderRadius: HHRadius.cardBr(),
+          border: Border.all(color: hh.statusQueued.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          children: [
+            Icon(LucideIcons.alertTriangle, size: 16, color: hh.statusQueued),
+            const SizedBox(width: HHSpacing.sm),
+            Expanded(
+              child: Text(
+                '${result.connection.displayName} — ${result.error?.message ?? 'Could not load'}',
+                style: hh.subhead().copyWith(color: hh.statusQueued),
+              ),
+            ),
+            AppPressable(
+              onTap: onRetry,
+              child: Text('Retry', style: hh.body().copyWith(color: hh.accent)),
+            ),
+          ],
         ),
       ),
     );

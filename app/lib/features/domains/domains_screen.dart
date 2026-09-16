@@ -11,6 +11,7 @@ import '../../shared/haptics.dart';
 import '../../shared/theme.dart';
 import '../../state/domains_notifier.dart';
 import '../../widgets/app_nav_bar.dart';
+import '../../widgets/app_search_bar.dart';
 import '../../widgets/app_pressable.dart';
 import '../../widgets/domain_card.dart';
 import '../../widgets/primary_button.dart';
@@ -47,7 +48,11 @@ class _DomainsScreenState extends ConsumerState<DomainsScreen> {
               child: Icon(LucideIcons.plus, color: hh.accent, size: 22),
             ),
           ],
-          bottom: _SearchBar(onChanged: (v) => setState(() => _search = v)),
+          bottom: AppSearchBar(
+            placeholder: 'Search domains…',
+            initialValue: _search,
+            onChanged: (v) => setState(() => _search = v),
+          ),
         ),
 
         SliverToBoxAdapter(
@@ -298,69 +303,6 @@ class _DomainsScreenState extends ConsumerState<DomainsScreen> {
           isDefaultAction: true,
           onPressed: () => Navigator.of(ctx).pop(),
           child: const Text('Cancel'),
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchBar extends StatelessWidget implements PreferredSizeWidget {
-  const _SearchBar({required this.onChanged});
-  final ValueChanged<String> onChanged;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(50);
-
-  @override
-  Widget build(BuildContext context) {
-    final hh = context.hh;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        HHSpacing.screenPadding,
-        0,
-        HHSpacing.screenPadding,
-        HHSpacing.sm,
-      ),
-      child: Container(
-        height: 38,
-        decoration: BoxDecoration(
-          color: hh.bgElevated,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: hh.cardBorder.withValues(alpha: 0.7),
-            width: 0.5,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            Icon(
-              LucideIcons.search,
-              size: 15,
-              color: hh.textTertiary,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                onChanged: onChanged,
-                style: hh.body().copyWith(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search domains…',
-                  hintStyle: hh.body().copyWith(
-                        fontSize: 14,
-                        color: hh.textTertiary,
-                      ),
-                  filled: false,
-                  fillColor: Colors.transparent,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

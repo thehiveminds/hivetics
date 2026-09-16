@@ -13,6 +13,7 @@ import '../../widgets/app_nav_bar.dart';
 import '../../widgets/app_grouped_section.dart';
 import '../../widgets/app_list_row.dart';
 import '../../widgets/app_status_pill.dart';
+import '../../widgets/primary_button.dart';
 import '../../widgets/skeleton.dart';
 import '../deploys/deployment_detail_screen.dart';
 
@@ -64,11 +65,11 @@ class SiteDeploymentsScreen extends ConsumerWidget {
                       const SizedBox(height: HHSpacing.md),
                       Text('Could not load deployments', style: hh.body()),
                       const SizedBox(height: HHSpacing.sm),
-                      TextButton(
-                        onPressed: () {
+                      TextActionButton(
+                        label: 'Retry',
+                        onTap: () {
                           ref.invalidate(projectDeploymentsProvider(args));
                         },
-                        child: const Text('Retry'),
                       ),
                     ],
                   ),

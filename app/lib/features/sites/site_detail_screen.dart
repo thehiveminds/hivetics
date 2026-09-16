@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/registered_domain.dart';
 import '../../models/site.dart';
 import '../../models/deployment.dart';
+import '../../models/deploy_status.dart';
 import '../../shared/formatters.dart';
 import '../../shared/theme.dart';
 import '../../state/deployments_notifier.dart';
@@ -43,7 +44,18 @@ class SiteDetailScreen extends ConsumerWidget {
       backgroundColor: hh.bgBase,
       body: CustomScrollView(
         slivers: [
-          AppNavBar(title: site.displayName),
+          AppNavBar(
+            title: site.displayName,
+            subtitle: [
+              if (project != null) project.providerId.displayName,
+              if (project?.framework != null) project!.framework!,
+            ].join(' · ').isNotEmpty
+                ? [
+                    if (project != null) project.providerId.displayName,
+                    if (project?.framework != null) project!.framework!,
+                  ].join(' · ')
+                : null,
+          ),
 
           SliverPadding(
             padding: const EdgeInsets.symmetric(vertical: HHSpacing.lg),
@@ -241,28 +253,84 @@ class _HeroSection extends StatelessWidget {
     final deploy = site.latestDeployment;
     final project = site.hostProject;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (deploy != null) ...[
-          AppStatusPill(status: deploy.status),
+    return Container(
+      decoration: BoxDecoration(
+        color: hh.bgElevated,
+        borderRadius: HHRadius.cardBr(),
+        border: Border.all(
+          color: hh.cardBorder.withValues(alpha: 0.7),
+          width: 0.5,
+        ),
+        boxShadow: hh.cardShadow,
+      ),
+      padding: const EdgeInsets.all(HHSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (deploy != null)
+                AppStatusPill(status: deploy.status)
+              else
+                const AppStatusPill(status: DeployStatus.unknown),
+              const Spacer(),
+              if (deploy?.createdAt != null)
+                Text(
+                  relativeTime(deploy!.createdAt),
+                  style: hh.footnote().copyWith(color: hh.textSecondary),
+                ),
+            ],
+          ),
+          if (deploy?.url != null) ...[
+            const SizedBox(height: HHSpacing.md),
+            CopyableValue(value: deploy!.url!, label: deploy.url),
+          ],
+          const SizedBox(height: HHSpacing.md),
+          Divider(height: 0.5, thickness: 0.5, color: hh.separator),
           const SizedBox(height: HHSpacing.sm),
-          if (deploy.url != null)
-            CopyableValue(value: deploy.url!, label: deploy.url),
-          const SizedBox(height: HHSpacing.xs),
-          Text(
-            [
-              if (deploy.branch != null) deploy.branch!,
-              relativeTime(deploy.createdAt),
-            ].whereType<String>().join(' · '),
-            style: hh.footnote(),
+          Row(
+            children: [
+              if (project != null) ...[
+                ProviderBadge(providerId: project.providerId),
+                const SizedBox(width: HHSpacing.xs),
+                Text(
+                  project.providerId.displayName,
+                  style: hh.footnote().copyWith(color: hh.textSecondary),
+                ),
+              ],
+              if (deploy?.branch != null) ...[
+                const SizedBox(width: HHSpacing.xs),
+                Text('·', style: hh.footnote().copyWith(color: hh.textTertiary)),
+                const SizedBox(width: HHSpacing.xs),
+                Icon(LucideIcons.gitBranch, size: 13, color: hh.textTertiary),
+                const SizedBox(width: 3),
+                Text(
+                  deploy!.branch!,
+                  style: hh.footnote().copyWith(color: hh.textSecondary),
+                ),
+              ],
+              if (project?.framework != null) ...[
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: hh.bgElevated2,
+                    borderRadius: HHRadius.pillBr(),
+                    border: Border.all(
+                      color: hh.cardBorder.withValues(alpha: 0.5),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Text(
+                    project!.framework!,
+                    style: hh.caption().copyWith(fontSize: 11, color: hh.textSecondary),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
-        if (project?.framework != null) ...[
-          const SizedBox(height: HHSpacing.xs),
-          Text(project!.framework!, style: hh.footnote()),
-        ],
-      ],
+      ),
     );
   }
 }

@@ -142,7 +142,7 @@ class _DomainAlertRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isError = domain.isExpired;
     final color = isError ? hh.statusFailed : hh.statusQueued;
-    final icon = isError ? Icons.error_outline : Icons.warning_amber_rounded;
+    final icon = isError ? LucideIcons.alertCircle : LucideIcons.alertTriangle;
 
     final String message;
     if (domain.isExpired) {

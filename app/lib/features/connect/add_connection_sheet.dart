@@ -908,18 +908,25 @@ class _CredentialsEntry extends StatelessWidget {
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: Icon(
-                    tokenObscured ? LucideIcons.eye : LucideIcons.eyeOff,
-                    size: 18,
-                    color: hh.textTertiary,
+                AppPressable(
+                  onTap: onToggleTokenObscure,
+                  child: Padding(
+                    padding: const EdgeInsets.all(HHSpacing.sm),
+                    child: Icon(
+                      tokenObscured ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 18,
+                      color: hh.textTertiary,
+                    ),
                   ),
-                  onPressed: onToggleTokenObscure,
                 ),
-                IconButton(
-                  icon: Icon(LucideIcons.clipboard, size: 18, color: hh.accent),
-                  onPressed: onPasteToken,
+                AppPressable(
+                  onTap: onPasteToken,
+                  child: Padding(
+                    padding: const EdgeInsets.all(HHSpacing.sm),
+                    child: Icon(LucideIcons.clipboard, size: 18, color: hh.accent),
+                  ),
                 ),
+                const SizedBox(width: HHSpacing.xs),
               ],
             ),
           ),
@@ -943,18 +950,25 @@ class _CredentialsEntry extends StatelessWidget {
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      secretObscured ? LucideIcons.eye : LucideIcons.eyeOff,
-                      size: 18,
-                      color: hh.textTertiary,
+                  AppPressable(
+                    onTap: onToggleSecretObscure,
+                    child: Padding(
+                      padding: const EdgeInsets.all(HHSpacing.sm),
+                      child: Icon(
+                        secretObscured ? LucideIcons.eye : LucideIcons.eyeOff,
+                        size: 18,
+                        color: hh.textTertiary,
+                      ),
                     ),
-                    onPressed: onToggleSecretObscure,
                   ),
-                  IconButton(
-                    icon: Icon(LucideIcons.clipboard, size: 18, color: hh.accent),
-                    onPressed: onPasteSecret,
+                  AppPressable(
+                    onTap: onPasteSecret,
+                    child: Padding(
+                      padding: const EdgeInsets.all(HHSpacing.sm),
+                      child: Icon(LucideIcons.clipboard, size: 18, color: hh.accent),
+                    ),
                   ),
+                  const SizedBox(width: HHSpacing.xs),
                 ],
               ),
             ),

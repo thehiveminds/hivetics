@@ -1,6 +1,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/site.dart';
 import '../models/site_alert.dart';
 import '../models/deploy_status.dart';
@@ -111,7 +112,7 @@ class _AlertRow extends StatelessWidget {
         b.severity.index.compareTo(a.severity.index));
     final top = sorted.first;
     final color = top.isError ? hh.statusFailed : hh.statusQueued;
-    final icon = top.isError ? Icons.error_outline : Icons.warning_amber_rounded;
+    final icon = top.isError ? LucideIcons.alertCircle : LucideIcons.alertTriangle;
 
     return Row(
       children: [

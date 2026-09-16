@@ -258,18 +258,19 @@ class _ThemePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = hh.footnote().copyWith(fontWeight: FontWeight.w600);
     return CupertinoSlidingSegmentedControl<ThemeMode>(
       groupValue: current,
-      children: const {
-        ThemeMode.system: Text('Auto'),
-        ThemeMode.light: Text('Light'),
-        ThemeMode.dark: Text('Dark'),
+      children: {
+        ThemeMode.system: Text('System', style: style),
+        ThemeMode.light: Text('Light', style: style),
+        ThemeMode.dark: Text('Dark', style: style),
       },
       onValueChanged: (m) {
         if (m != null) onChanged(m);
       },
       backgroundColor: hh.fill,
-      thumbColor: hh.bgElevated,
+      thumbColor: hh.isDark ? hh.bgElevated : const Color(0xFFFFFFFF),
     );
   }
 }

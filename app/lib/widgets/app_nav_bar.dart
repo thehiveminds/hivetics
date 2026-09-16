@@ -8,6 +8,7 @@ class AppNavBar extends StatelessWidget {
   const AppNavBar({
     super.key,
     required this.title,
+    this.subtitle,
     this.trailing,
     this.bottom,
     this.pinned = true,
@@ -15,6 +16,7 @@ class AppNavBar extends StatelessWidget {
   });
 
   final String title;
+  final String? subtitle;
 
   /// Icon-only action widgets.
   final List<Widget>? trailing;
@@ -43,19 +45,46 @@ class AppNavBar extends StatelessWidget {
       shadowColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      toolbarHeight: 52,
+      toolbarHeight: subtitle != null ? 56 : 52,
       centerTitle: canPop,
       titleSpacing: canPop ? 0 : HHSpacing.screenPadding,
-      title: Text(
-        title,
-        style: hh.headline().copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
+      title: subtitle != null
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+                  canPop ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: hh.headline().copyWith(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  subtitle!,
+                  style: hh.footnote().copyWith(
+                        fontSize: 12,
+                        color: hh.textSecondary,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            )
+          : Text(
+              title,
+              style: hh.headline().copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
       leading: canPop
           ? Center(
               child: AppPressable(

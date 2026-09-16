@@ -6,11 +6,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../models/deployment.dart';
 import '../../models/deploy_status.dart';
 import '../../models/connection.dart';
+import '../../models/service_ref.dart';
 import '../../shared/formatters.dart';
 import '../../shared/haptics.dart';
 import '../../shared/theme.dart';
+import '../../state/connections_notifier.dart';
 import '../../state/deployments_notifier.dart';
+import '../../state/sites_notifier.dart';
 import '../../widgets/app_nav_bar.dart';
+import '../../widgets/app_search_bar.dart';
 import '../../widgets/app_status_pill.dart';
 import '../../widgets/app_pressable.dart';
 import '../../widgets/skeleton.dart';
@@ -24,7 +28,7 @@ class DeploysScreen extends ConsumerStatefulWidget {
 }
 
 class _DeploysScreenState extends ConsumerState<DeploysScreen> {
-  final String _search = '';
+  String _search = '';
   DeployStatus? _filterStatus;
   ProviderId? _filterProvider;
 
@@ -32,11 +36,40 @@ class _DeploysScreenState extends ConsumerState<DeploysScreen> {
   Widget build(BuildContext context) {
     final hh = context.hh;
     final deploysAsync = ref.watch(deploymentsProvider);
+    final sitesAsync = ref.watch(sitesProvider);
+    final connectionsAsync = ref.watch(connectionsProvider);
+
+    final siteNameMap = <String, String>{};
+    if (sitesAsync.valueOrNull != null) {
+      for (final s in sitesAsync.valueOrNull!.allSites) {
+        if (s.hostProject != null) {
+          siteNameMap[s.hostProject!.id] = s.displayName;
+        }
+        siteNameMap[s.id] = s.displayName;
+      }
+    }
+
+    final connectionProviderMap = <String, ProviderId>{};
+    if (connectionsAsync.valueOrNull != null) {
+      for (final c in connectionsAsync.valueOrNull!) {
+        if (c.service is HostRef) {
+          connectionProviderMap[c.id] = (c.service as HostRef).provider;
+        }
+      }
+    }
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        const AppNavBar(title: 'Deploys', showBackButton: false),
+        AppNavBar(
+          title: 'Deploys',
+          showBackButton: false,
+          bottom: AppSearchBar(
+            placeholder: 'Search deployments…',
+            initialValue: _search,
+            onChanged: (v) => setState(() => _search = v),
+          ),
+        ),
 
         SliverToBoxAdapter(
           child: _FilterRow(
@@ -74,7 +107,7 @@ class _DeploysScreenState extends ConsumerState<DeploysScreen> {
             ),
           ),
           data: (deploys) {
-            final filtered = _filter(deploys);
+            final filtered = _filter(deploys, siteNameMap, connectionProviderMap);
             if (filtered.isEmpty) {
               return SliverFillRemaining(
                 hasScrollBody: false,
@@ -113,12 +146,14 @@ class _DeploysScreenState extends ConsumerState<DeploysScreen> {
                       child: Text(item.header!, style: hh.caption2()),
                     );
                   }
+                  final deployment = item.deployment!;
                   return _DeployRow(
-                    deployment: item.deployment!,
+                    deployment: deployment,
+                    siteName: siteNameMap[deployment.projectId],
                     hh: hh,
                     onTap: () => Navigator.of(context).push(
                       CupertinoPageRoute<void>(
-                        builder: (_) => DeploymentDetailScreen(deployment: item.deployment!),
+                        builder: (_) => DeploymentDetailScreen(deployment: deployment),
                       ),
                     ),
                   );
@@ -134,18 +169,29 @@ class _DeploysScreenState extends ConsumerState<DeploysScreen> {
     );
   }
 
-  List<Deployment> _filter(List<Deployment> all) {
+  List<Deployment> _filter(
+    List<Deployment> all,
+    Map<String, String> siteNameMap,
+    Map<String, ProviderId> connectionProviderMap,
+  ) {
     var result = all;
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
       result = result
           .where((d) =>
               (d.commitMessage?.toLowerCase().contains(q) ?? false) ||
-              (d.commitSha?.contains(q) ?? false))
+              (d.commitSha?.contains(q) ?? false) ||
+              (d.branch?.toLowerCase().contains(q) ?? false) ||
+              (siteNameMap[d.projectId]?.toLowerCase().contains(q) ?? false))
           .toList();
     }
     if (_filterStatus != null) {
       result = result.where((d) => d.status == _filterStatus).toList();
+    }
+    if (_filterProvider != null) {
+      result = result
+          .where((d) => connectionProviderMap[d.connectionId] == _filterProvider)
+          .toList();
     }
 
     return result;
@@ -177,10 +223,12 @@ class _DayItem {
 class _DeployRow extends StatelessWidget {
   const _DeployRow({
     required this.deployment,
+    this.siteName,
     required this.hh,
     required this.onTap,
   });
   final Deployment deployment;
+  final String? siteName;
   final HHTokens hh;
   final VoidCallback onTap;
 
@@ -236,9 +284,25 @@ class _DeployRow extends StatelessWidget {
               ),
               const SizedBox(height: HHSpacing.sm),
 
-              // Metadata row: SHA pill + Git Branch + Duration
+              // Metadata row: Site + SHA pill + Git Branch + Duration
               Row(
                 children: [
+                  if (siteName != null && siteName!.isNotEmpty) ...[
+                    Flexible(
+                      child: Text(
+                        siteName!,
+                        style: hh.footnote().copyWith(
+                              color: hh.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('·', style: hh.footnote().copyWith(color: hh.textTertiary)),
+                    const SizedBox(width: 6),
+                  ],
                   if (deployment.commitSha != null) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -270,7 +334,9 @@ class _DeployRow extends StatelessWidget {
                     ),
                   ],
                   if (deployment.duration != null) ...[
-                    if (deployment.branch != null || deployment.commitSha != null) ...[
+                    if (deployment.branch != null ||
+                        deployment.commitSha != null ||
+                        (siteName != null && siteName!.isNotEmpty)) ...[
                       const SizedBox(width: HHSpacing.xs),
                       Text('·', style: hh.footnote().copyWith(color: hh.textTertiary)),
                       const SizedBox(width: HHSpacing.xs),

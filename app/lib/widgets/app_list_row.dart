@@ -1,6 +1,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../shared/theme.dart';
 import 'app_pressable.dart';
 
@@ -103,7 +104,7 @@ class AppListRow extends StatelessWidget {
 
           if (showChevron) ...[
             const SizedBox(width: HHSpacing.xs),
-            Icon(Icons.chevron_right, color: hh.textTertiary, size: 14),
+            Icon(LucideIcons.chevronRight, color: hh.textTertiary, size: 14),
           ],
         ],
       ),

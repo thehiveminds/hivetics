@@ -12,6 +12,7 @@ import '../../shared/haptics.dart';
 import '../../shared/theme.dart';
 import '../../state/sites_notifier.dart';
 import '../../widgets/app_nav_bar.dart';
+import '../../widgets/app_search_bar.dart';
 import '../../widgets/site_card.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/app_pressable.dart';
@@ -30,11 +31,21 @@ class _SitesScreenState extends ConsumerState<SitesScreen> {
   String _search = '';
   ProviderId? _filterProvider;
   bool _filterNeedsAttention = false;
+  bool _hasSetInitialAttentionFilter = false;
 
   @override
   Widget build(BuildContext context) {
     final hh = context.hh;
     final sitesAsync = ref.watch(sitesProvider);
+
+    // DESIGN.md §6.1: "Needs attention" is the default filter when any site has an alert, else "All"
+    if (!_hasSetInitialAttentionFilter && sitesAsync.valueOrNull != null) {
+      _hasSetInitialAttentionFilter = true;
+      final hasAlerts = sitesAsync.valueOrNull!.allSites.any((s) => s.hasAlerts);
+      if (hasAlerts) {
+        _filterNeedsAttention = true;
+      }
+    }
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -48,7 +59,11 @@ class _SitesScreenState extends ConsumerState<SitesScreen> {
               child: Icon(LucideIcons.plus, color: hh.accent, size: 22),
             ),
           ],
-          bottom: _SearchBar(onChanged: (v) => setState(() => _search = v)),
+          bottom: AppSearchBar(
+            placeholder: 'Search sites & domains…',
+            initialValue: _search,
+            onChanged: (v) => setState(() => _search = v),
+          ),
         ),
 
         SliverToBoxAdapter(
@@ -275,73 +290,6 @@ class _SitesScreenState extends ConsumerState<SitesScreen> {
           isDefaultAction: true,
           onPressed: () => Navigator.of(ctx).pop(),
           child: const Text('Cancel'),
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchBar extends StatelessWidget implements PreferredSizeWidget {
-  const _SearchBar({required this.onChanged});
-  final ValueChanged<String> onChanged;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(50);
-
-  @override
-  Widget build(BuildContext context) {
-    final hh = context.hh;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        HHSpacing.screenPadding,
-        0,
-        HHSpacing.screenPadding,
-        HHSpacing.sm,
-      ),
-      child: Container(
-        height: 38,
-        decoration: BoxDecoration(
-          color: hh.bgElevated,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: hh.cardBorder.withValues(alpha: 0.7),
-            width: 0.5,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            Icon(
-              LucideIcons.search,
-              size: 15,
-              color: hh.textTertiary,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                onChanged: onChanged,
-                style: hh.body().copyWith(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search sites & domains…',
-                  hintStyle: hh.body().copyWith(
-                        fontSize: 14,
-                        color: hh.textTertiary,
-                      ),
-                  // The global inputDecorationTheme is `filled: true` with its
-                  // own colour and corner radius. Left on, the field painted a
-                  // second, differently-rounded rectangle inside this
-                  // container. The container is the visible background here.
-                  filled: false,
-                  fillColor: Colors.transparent,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

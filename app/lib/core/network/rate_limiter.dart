@@ -10,8 +10,14 @@ enum ProviderRateLimit {
   /// 500/min.
   netlify(maxRequests: 500, windowSeconds: 60),
 
-  /// 1200 / 5 min — tightest. CF Pages + DNS share this quota.
-  cloudflare(maxRequests: 1200, windowSeconds: 300);
+  /// 1200 / 5 min — tightest. CF Pages + DNS + Registrar share this quota.
+  cloudflare(maxRequests: 1200, windowSeconds: 300),
+
+  /// ~20k/month ≈ 660/day. Conservative 60/min burst.
+  godaddy(maxRequests: 60, windowSeconds: 60),
+
+  /// Conservative 60/min bucket. Backs off on 429 via RetryInterceptor.
+  porkbun(maxRequests: 60, windowSeconds: 60);
 
   const ProviderRateLimit({
     required this.maxRequests,
@@ -52,11 +58,13 @@ class RateLimiter {
   }
 
   /// Release the global concurrent slot after the request completes.
+  /// If a waiter is queued, ownership of the slot is passed directly to the waiter.
   void release() {
-    _currentConcurrent--;
     if (_concurrentCompleter.isNotEmpty) {
       final next = _concurrentCompleter.removeAt(0);
       next.complete();
+    } else if (_currentConcurrent > 0) {
+      _currentConcurrent--;
     }
   }
 
@@ -68,7 +76,6 @@ class RateLimiter {
     final c = Completer<void>();
     _concurrentCompleter.add(c);
     await c.future;
-    _currentConcurrent++;
   }
 }
 

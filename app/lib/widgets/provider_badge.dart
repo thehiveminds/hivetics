@@ -32,7 +32,7 @@ class ProviderBadge extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: config.bg,
-        borderRadius: BorderRadius.circular(HHRadius.providerBadge),
+        borderRadius: BorderRadius.circular(size >= 28 ? 10 : HHRadius.providerBadge),
       ),
       alignment: Alignment.center,
       child: SvgPicture.asset(
@@ -107,7 +107,7 @@ class RegistrarBadge extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: config.bg,
-        borderRadius: BorderRadius.circular(HHRadius.providerBadge),
+        borderRadius: BorderRadius.circular(size >= 28 ? 10 : HHRadius.providerBadge),
       ),
       alignment: Alignment.center,
       child: SvgPicture.asset(
@@ -212,7 +212,7 @@ class AnalyticsBadge extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: config.bg,
-        borderRadius: BorderRadius.circular(HHRadius.providerBadge),
+        borderRadius: BorderRadius.circular(size >= 28 ? 10 : HHRadius.providerBadge),
       ),
       alignment: Alignment.center,
       child: SvgPicture.asset(

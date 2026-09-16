@@ -520,9 +520,15 @@ class _CategoryPicker extends StatelessWidget {
         ),
         const SizedBox(height: HHSpacing.lg),
         _CategoryCard(
-          icon: LucideIcons.server,
           title: 'Hosting Platform',
           subtitle: 'Vercel, Netlify, Cloudflare Pages',
+          badges: const [
+            ProviderBadge(providerId: ProviderId.vercel, size: 22),
+            SizedBox(width: 4),
+            ProviderBadge(providerId: ProviderId.netlify, size: 22),
+            SizedBox(width: 4),
+            ProviderBadge(providerId: ProviderId.cloudflarepages, size: 22),
+          ],
           onTap: () {
             HHHaptics.selectionClick();
             onPick(_Category.hosting);
@@ -531,9 +537,15 @@ class _CategoryPicker extends StatelessWidget {
         ),
         const SizedBox(height: HHSpacing.md),
         _CategoryCard(
-          icon: LucideIcons.globe,
           title: 'Domain Registrar',
-          subtitle: 'GoDaddy, Porkbun, Cloudflare Registrar',
+          subtitle: 'GoDaddy, Porkbun, Cloudflare, Name.com',
+          badges: const [
+            RegistrarBadge(registrarId: RegistrarId.godaddy, size: 22),
+            SizedBox(width: 4),
+            RegistrarBadge(registrarId: RegistrarId.porkbun, size: 22),
+            SizedBox(width: 4),
+            RegistrarBadge(registrarId: RegistrarId.cloudflareregistrar, size: 22),
+          ],
           onTap: () {
             HHHaptics.selectionClick();
             onPick(_Category.registrar);
@@ -542,9 +554,15 @@ class _CategoryPicker extends StatelessWidget {
         ),
         const SizedBox(height: HHSpacing.md),
         _CategoryCard(
-          icon: LucideIcons.lineChart,
           title: 'Analytics & Search',
           subtitle: 'Google Search Console, GA4, Clarity',
+          badges: const [
+            AnalyticsBadge(providerId: AnalyticsProviderId.gsc, size: 22),
+            SizedBox(width: 4),
+            AnalyticsBadge(providerId: AnalyticsProviderId.ga4, size: 22),
+            SizedBox(width: 4),
+            AnalyticsBadge(providerId: AnalyticsProviderId.clarity, size: 22),
+          ],
           onTap: () {
             HHHaptics.selectionClick();
             onPick(_Category.analytics);
@@ -559,16 +577,16 @@ class _CategoryPicker extends StatelessWidget {
 
 class _CategoryCard extends StatelessWidget {
   const _CategoryCard({
-    required this.icon,
     required this.title,
     required this.subtitle,
+    required this.badges,
     required this.onTap,
     required this.hh,
   });
 
-  final IconData icon;
   final String title;
   final String subtitle;
+  final List<Widget> badges;
   final VoidCallback onTap;
   final HHTokens hh;
 
@@ -581,22 +599,15 @@ class _CategoryCard extends StatelessWidget {
         padding: const EdgeInsets.all(HHSpacing.lg),
         decoration: BoxDecoration(
           color: hh.bgElevated,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: hh.cardBorder.withValues(alpha: 0.8)),
+          borderRadius: HHRadius.cardBr(),
+          border: Border.all(
+            color: hh.cardBorder.withValues(alpha: 0.8),
+            width: 0.5,
+          ),
           boxShadow: hh.cardShadow,
         ),
         child: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: hh.accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: hh.accent, size: 20),
-            ),
-            const SizedBox(width: HHSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,6 +630,11 @@ class _CategoryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: HHSpacing.sm),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: badges,
+            ),
+            const SizedBox(width: HHSpacing.xs),
             Icon(LucideIcons.chevronRight, color: hh.textTertiary, size: 18),
           ],
         ),

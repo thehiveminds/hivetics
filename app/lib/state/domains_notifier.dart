@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';

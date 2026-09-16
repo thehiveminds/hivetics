@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // Credential storage codec — Phase 2 §3.5/§8. A legacy Phase 1 row is a bare
 // bearer-token string with no JSON envelope; it must read back correctly and
 // be flagged for a silent one-time rewrite.

@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // Provider registry — maps ProviderId → HostingProvider singleton.
 
 import '../models/connection.dart';

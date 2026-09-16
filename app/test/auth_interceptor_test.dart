@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // Porkbun auth (Phase 2 §2.2/§8): keys must land as plain headers, never in
 // a URL or POST body.
 

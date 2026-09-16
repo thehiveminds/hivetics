@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hivehub/models/registered_domain.dart';
 import 'package:hivehub/models/registrar_id.dart';

@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // Status normalization unit tests — MANDATORY per ARCHITECTURE §10.
 // Test every mapping including the unknown fallback. Getting this wrong
 // shows a broken production build as "live" or shows "failed" for an unknown state.

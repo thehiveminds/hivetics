@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // domain_utils unit tests. BUILD-PLAN §Phase 1 — build + test now.
 
 import 'package:flutter_test/flutter_test.dart';

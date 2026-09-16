@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // ─────────────────────────────────────────────────────────────────────────────
 // shared/theme.dart — SINGLE SOURCE OF TRUTH for every design token.
 //

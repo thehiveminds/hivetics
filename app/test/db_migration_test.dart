@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 // Drift v1 → v2 migration (Phase 2 §4/§8). This path has never executed in
 // production — Phase 1 only ever created a fresh v2+ file via onCreate. We
 // build a real v1 file (schema exactly as Phase 1 shipped it) with drift's

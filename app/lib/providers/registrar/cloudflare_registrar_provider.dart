@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';

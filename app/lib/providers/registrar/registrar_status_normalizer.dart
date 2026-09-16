@@ -1,4 +1,3 @@
-// MIT Licence — TheHiveMinds / Hivetics
 import '../../models/registered_domain.dart';
 import '../../models/site_alert.dart';
 

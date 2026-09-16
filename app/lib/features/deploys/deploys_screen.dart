@@ -186,9 +186,9 @@ class _DeployRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final commitTitle = deployment.commitMessage?.trim().isNotEmpty == true
-        ? deployment.commitMessage!.split('\n').first
-        : (deployment.url ?? 'Deployment');
+    final rawMessage = deployment.commitMessage?.trim();
+    final hasCommit = rawMessage != null && rawMessage.isNotEmpty;
+    final commitText = hasCommit ? rawMessage : (deployment.url ?? 'Deployment');
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -210,30 +210,82 @@ class _DeployRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top Row: Status Pill + Relative timestamp
               Row(
                 children: [
                   AppStatusPill(status: deployment.status),
-                  const SizedBox(width: HHSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      commitTitle,
-                      style: hh.headline().copyWith(fontSize: 15),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  const Spacer(),
+                  Text(
+                    relativeTime(deployment.createdAt),
+                    style: hh.footnote().copyWith(color: hh.textSecondary),
                   ),
                 ],
               ),
-              const SizedBox(height: HHSpacing.xs),
+              const SizedBox(height: HHSpacing.sm),
+
+              // Full Commit Message across multiple lines
               Text(
-                [
-                  if (deployment.commitSha != null) shortSha(deployment.commitSha),
-                  if (deployment.branch != null) deployment.branch,
-                  relativeTime(deployment.createdAt),
-                  if (deployment.duration != null) formatDuration(deployment.duration),
-                ].join(' · '),
-                style: hh.footnote(),
+                commitText,
+                style: hh.headline().copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: HHSpacing.sm),
+
+              // Metadata row: SHA pill + Git Branch + Duration
+              Row(
+                children: [
+                  if (deployment.commitSha != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: hh.bgElevated2,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: hh.cardBorder.withValues(alpha: 0.5),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Text(
+                        shortSha(deployment.commitSha),
+                        style: hh.mono().copyWith(fontSize: 11, color: hh.textSecondary),
+                      ),
+                    ),
+                    const SizedBox(width: HHSpacing.sm),
+                  ],
+                  if (deployment.branch != null) ...[
+                    Icon(LucideIcons.gitBranch, size: 13, color: hh.textTertiary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        deployment.branch!,
+                        style: hh.footnote().copyWith(color: hh.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                  if (deployment.duration != null) ...[
+                    if (deployment.branch != null || deployment.commitSha != null) ...[
+                      const SizedBox(width: HHSpacing.xs),
+                      Text('·', style: hh.footnote().copyWith(color: hh.textTertiary)),
+                      const SizedBox(width: HHSpacing.xs),
+                    ],
+                    Icon(LucideIcons.clock, size: 12, color: hh.textTertiary),
+                    const SizedBox(width: 3),
+                    Text(
+                      formatDuration(deployment.duration),
+                      style: hh.footnote().copyWith(color: hh.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+
+              // Error message if failed
               if (deployment.status == DeployStatus.failed &&
                   deployment.errorMessage != null) ...[
                 const SizedBox(height: HHSpacing.xs),

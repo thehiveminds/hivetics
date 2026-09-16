@@ -18,10 +18,14 @@ class AppListRow extends StatelessWidget {
     this.onTap,
     this.titleStyle,
     this.subtitleStyle,
+    this.titleMaxLines = 1,
+    this.subtitleMaxLines = 1,
   });
 
   final String title;
   final String? subtitle;
+  final int? titleMaxLines;
+  final int? subtitleMaxLines;
 
   /// Icon inside the 28×28 icon tile (radius 7, colour on 12% tint).
   final IconData? leadingIcon;
@@ -72,16 +76,16 @@ class AppListRow extends StatelessWidget {
                 Text(
                   title,
                   style: titleStyle ?? hh.headline(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: titleMaxLines,
+                  overflow: titleMaxLines != null ? TextOverflow.ellipsis : null,
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     subtitle!,
                     style: subtitleStyle ?? hh.subhead(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: subtitleMaxLines,
+                    overflow: subtitleMaxLines != null ? TextOverflow.ellipsis : null,
                   ),
                 ],
               ],

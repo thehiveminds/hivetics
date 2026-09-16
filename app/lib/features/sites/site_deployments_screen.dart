@@ -96,7 +96,10 @@ class SiteDeploymentsScreen extends ConsumerWidget {
                     header: '${deploys.length} Deployments',
                     children: deploys.map((d) {
                       return AppListRow(
-                        title: d.commitMessage ?? relativeTime(d.createdAt),
+                        title: (d.commitMessage?.trim().isNotEmpty == true)
+                            ? d.commitMessage!.trim()
+                            : relativeTime(d.createdAt),
+                        titleMaxLines: 2,
                         subtitle: [
                           shortSha(d.commitSha),
                           if (d.branch != null) d.branch,

@@ -58,12 +58,31 @@ class DeploymentDetailScreen extends StatelessWidget {
                           label: shortSha(deployment.commitSha),
                         ),
                       ),
-                    if (deployment.commitMessage != null)
-                      AppListRow(title: deployment.commitMessage!),
                     if (deployment.commitAuthor != null)
                       AppListRow(
                         title: 'Author',
                         trailingValue: deployment.commitAuthor,
+                      ),
+                    if (deployment.commitMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: HHSpacing.lg,
+                          vertical: HHSpacing.md,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'MESSAGE',
+                              style: hh.caption2().copyWith(color: hh.textTertiary),
+                            ),
+                            const SizedBox(height: HHSpacing.xs),
+                            SelectableText(
+                              deployment.commitMessage!,
+                              style: hh.body().copyWith(height: 1.4),
+                            ),
+                          ],
+                        ),
                       ),
                   ],
                 ),

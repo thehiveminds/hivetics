@@ -280,7 +280,10 @@ class _DeployRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppListRow(
-      title: deployment.commitMessage ?? relativeTime(deployment.createdAt),
+      title: (deployment.commitMessage?.trim().isNotEmpty == true)
+          ? deployment.commitMessage!.trim()
+          : relativeTime(deployment.createdAt),
+      titleMaxLines: 2,
       subtitle: [
         shortSha(deployment.commitSha),
         if (deployment.branch != null) deployment.branch,
